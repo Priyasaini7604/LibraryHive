@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.memberships",
     "apps.payments",
     "apps.complaints",
+    "apps.bookings",
 ]
 AUTH_USER_MODEL = "accounts.User"
 

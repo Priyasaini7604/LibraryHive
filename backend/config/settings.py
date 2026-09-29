@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.memberships",
     "apps.payments",
     "apps.complaints",
+    "apps.bookings",
 ]
 AUTH_USER_MODEL = "accounts.User"
 
@@ -109,6 +110,10 @@ else:
         }
     }
 
+
+
+RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET')
 
 
 # Password validation

@@ -22,12 +22,37 @@ class Migration(migrations.Migration):
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('status', models.CharField(choices=[('reserved', 'Reserved'), ('confirmed', 'Confirmed'), ('cancelled', 'Cancelled'), ('expired', 'Expired')], default='reserved', max_length=20)),
+                ('status', models.CharField(
+                    choices=[
+                        ('reserved', 'Reserved'),
+                        ('confirmed', 'Confirmed'),
+                        ('cancelled', 'Cancelled'),
+                        ('expired', 'Expired')
+                    ],
+                    default='reserved',
+                    max_length=20
+                )),
                 ('reserved_until', models.DateTimeField()),
-                ('library', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='bookings', to='libraries.library')),
-                ('plan', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='bookings', to='libraries.pricingplan')),
-                ('seat', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='bookings', to='libraries.seat')),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='bookings', to=settings.AUTH_USER_MODEL)),
+                ('library', models.ForeignKey(
+                    on_delete=django.db.models.deletion.CASCADE,
+                    related_name='bookings',
+                    to='libraries.library'
+                )),
+                ('plan', models.ForeignKey(
+                    on_delete=django.db.models.deletion.PROTECT,
+                    related_name='bookings',
+                    to='libraries.pricingplan'
+                )),
+                ('seat', models.ForeignKey(
+                    on_delete=django.db.models.deletion.CASCADE,
+                    related_name='bookings',
+                    to='seats.seat'
+                )),
+                ('student', models.ForeignKey(
+                    on_delete=django.db.models.deletion.CASCADE,
+                    related_name='bookings',
+                    to=settings.AUTH_USER_MODEL
+                )),
             ],
             options={
                 'abstract': False,

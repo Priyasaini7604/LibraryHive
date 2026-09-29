@@ -48,6 +48,26 @@ class Payment(BaseModel):
         default="pending",
     )
 
+    razorpay_order_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    razorpay_payment_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    razorpay_signature = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+
     transaction_id = models.CharField(
         max_length=100,
         unique=True,

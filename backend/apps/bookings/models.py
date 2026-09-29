@@ -2,8 +2,8 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import BaseModel
-from apps.libraries.models import Library, Seat, PricingPlan
-
+from apps.libraries.models import Library, PricingPlan
+from apps.seats.models import Seat
 
 class Booking(BaseModel):
 

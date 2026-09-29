@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.bookings.models import Booking
-from apps.libraries.models import Seat
+from apps.seats.models import Seat
 from apps.memberships.models import Membership
 
 from .models import Payment

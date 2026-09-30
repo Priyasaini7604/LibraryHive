@@ -68,14 +68,14 @@ class BookingExpireView(APIView):
         count = 0
 
         for booking in expired_bookings:
-            seat = Seat.objects.select_for_update().get(
+            seat = Seat.objects.select_for_update().filter(
                 id=booking.seat_id
-            )
+            ).first()
 
             booking.status = "expired"
             booking.save(update_fields=["status", "updated_at"])
 
-            if seat.status == "reserved":
+            if seat and seat.status == "reserved":
                 seat.status = "empty"
                 seat.save(update_fields=["status", "updated_at"])
 
@@ -84,5 +84,4 @@ class BookingExpireView(APIView):
         return Response({
             "message": "Expired bookings processed.",
             "expired_count": count,
-        })  
-    
+        })

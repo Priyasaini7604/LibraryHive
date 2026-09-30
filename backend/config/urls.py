@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 
+
 api_v1_patterns = [
     path("auth/", include("apps.accounts.urls")),
     path("libraries/", include("apps.libraries.urls")),
@@ -8,7 +9,9 @@ api_v1_patterns = [
     path("bookings/", include("apps.bookings.urls")),
     path("payments/", include("apps.payments.urls")),
     path("memberships/", include("apps.memberships.urls")),
+    path("notifications/", include("apps.notifications.urls")),
 ]
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),

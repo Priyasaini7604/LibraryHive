@@ -101,6 +101,7 @@ export interface ApiResponse<T> {
   data: T;
   error: string | null;
 }
+
 export type BookingStatus =
   | "reserved"
   | "confirmed"
@@ -154,6 +155,24 @@ export interface Membership {
   start_date: string;
   next_due_date: string;
   status: MembershipStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type NotificationType =
+  | "renewal_upcoming"
+  | "payment_due"
+  | "payment_overdue";
+
+export interface Notification {
+  id: string;
+  recipient: string;
+  library: string;
+  membership?: string | null;
+  notification_type: NotificationType;
+  title: string;
+  message: string;
+  is_read: boolean;
   created_at?: string;
   updated_at?: string;
 }

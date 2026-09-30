@@ -16,4 +16,5 @@ urlpatterns = [
     # Both /api/v1/ and /api/ are supported
     path("api/v1/", include(api_v1_patterns)),
     path("api/", include(api_v1_patterns)),
+    path("api/complaints/", include("apps.complaints.urls")),
 ]

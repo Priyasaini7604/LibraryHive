@@ -9,13 +9,15 @@ import {
   Booking,
   Payment,
   Membership,
+  Notification,
 } from "./types";
+
 import { authStorage } from "./auth";
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000/api/v1";
 
-// Ensure URL does not end with trailing slash for clean concatenation
 const API_BASE = BASE_URL.replace(/\/+$/, "");
 
 class ApiError extends Error {
@@ -30,9 +32,56 @@ class ApiError extends Error {
   }
 }
 
+// ---------------------------------------------------------
+// Refresh access token
+// ---------------------------------------------------------
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = authStorage.getRefreshToken();
+
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/refresh/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        refresh: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      authStorage.clear();
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.access) {
+      authStorage.clear();
+      return null;
+    }
+
+    authStorage.setAccessToken(data.access);
+
+    return data.access;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------
+// API request helper
+// ---------------------------------------------------------
+
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  isRetry = false
 ): Promise<T> {
   const token = authStorage.getAccessToken();
 
@@ -58,18 +107,31 @@ async function request<T>(
 
   const data = isJson ? await response.json() : null;
 
+  // -------------------------------------------------------
+  // Access token expired/invalid
+  // -------------------------------------------------------
+
+  if (response.status === 401 && !isRetry) {
+    const newAccessToken = await refreshAccessToken();
+
+    if (newAccessToken) {
+      return request<T>(endpoint, options, true);
+    }
+  }
+
   if (!response.ok) {
     const errorMsg =
       data?.error ||
       data?.detail ||
-      (typeof data === "string" ? data : JSON.stringify(data)) ||
+      (typeof data === "string"
+        ? data
+        : JSON.stringify(data)) ||
       `Request failed with status ${response.status}`;
 
     throw new ApiError(errorMsg, response.status, data);
   }
 
-  // If response follows { success: true, data: T },
-  // return data.data, otherwise return full data.
+  // If response follows { success: true, data: T }
   if (
     data &&
     typeof data === "object" &&
@@ -103,9 +165,9 @@ export const apiClient = {
       }
     }
 
-    // Fetch profile
     try {
       const user = await this.getMe();
+
       authStorage.setUser(user);
 
       return { ...res, user };
@@ -137,7 +199,7 @@ export const apiClient = {
   },
 
   // =========================================================
-  // Libraries (Person 1)
+  // Libraries
   // =========================================================
 
   async getLibraries(params?: {
@@ -204,7 +266,7 @@ export const apiClient = {
   },
 
   // =========================================================
-  // Seats (Person 1 setup integration & Person 2)
+  // Seats
   // =========================================================
 
   async getLibrarySeats(libraryId: string): Promise<Seat[]> {
@@ -245,7 +307,7 @@ export const apiClient = {
   },
 
   // =========================================================
-  // Bookings (Person 3)
+  // Bookings
   // =========================================================
 
   async getBookings(): Promise<Booking[]> {
@@ -264,7 +326,7 @@ export const apiClient = {
   },
 
   // =========================================================
-  // Payments (Person 3)
+  // Payments
   // =========================================================
 
   async createPaymentOrder(bookingId: string): Promise<{
@@ -303,10 +365,68 @@ export const apiClient = {
   },
 
   // =========================================================
-  // Memberships (Person 3)
+  // Memberships
   // =========================================================
 
   async getMemberships(): Promise<Membership[]> {
     return request<Membership[]>("/memberships/");
+  },
+
+  // ---------------------------------------------------------
+  // Renewal Payment
+  // ---------------------------------------------------------
+
+  async createRenewalPaymentOrder(
+    membershipId: string
+  ): Promise<{
+    order_id: string;
+    amount: number | string;
+    currency: string;
+    key_id: string;
+    membership_id: string;
+    payment_id: string;
+  }> {
+    return request("/payments/renewal/create-order/", {
+      method: "POST",
+      body: JSON.stringify({
+        membership: membershipId,
+      }),
+    });
+  },
+
+  async verifyRenewalPayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<{
+    message: string;
+    payment: Payment;
+    membership_id: string;
+    membership_status: string;
+    next_due_date: string;
+  }> {
+    return request("/payments/renewal/verify/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // =========================================================
+  // Notifications
+  // =========================================================
+
+  async getNotifications(): Promise<Notification[]> {
+    return request<Notification[]>("/notifications/");
+  },
+
+  async markNotificationAsRead(
+    notificationId: string
+  ): Promise<Notification> {
+    return request<Notification>(
+      `/notifications/${notificationId}/read/`,
+      {
+        method: "PATCH",
+      }
+    );
   },
 };

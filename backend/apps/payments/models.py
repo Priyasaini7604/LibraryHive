@@ -3,6 +3,7 @@ from django.db import models
 
 from apps.core.models import BaseModel
 from apps.bookings.models import Booking
+from apps.memberships.models import Membership
 
 
 class Payment(BaseModel):
@@ -29,6 +30,16 @@ class Payment(BaseModel):
         Booking,
         on_delete=models.PROTECT,
         related_name="payments",
+        null=True,
+        blank=True,
+    )
+
+    membership = models.ForeignKey(
+        Membership,
+        on_delete=models.PROTECT,
+        related_name="payments",
+        null=True,
+        blank=True,
     )
 
     amount = models.DecimalField(

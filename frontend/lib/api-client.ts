@@ -372,6 +372,45 @@ export const apiClient = {
     return request<Membership[]>("/memberships/");
   },
 
+  // ---------------------------------------------------------
+  // Renewal Payment
+  // ---------------------------------------------------------
+
+  async createRenewalPaymentOrder(
+    membershipId: string
+  ): Promise<{
+    order_id: string;
+    amount: number | string;
+    currency: string;
+    key_id: string;
+    membership_id: string;
+    payment_id: string;
+  }> {
+    return request("/payments/renewal/create-order/", {
+      method: "POST",
+      body: JSON.stringify({
+        membership: membershipId,
+      }),
+    });
+  },
+
+  async verifyRenewalPayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<{
+    message: string;
+    payment: Payment;
+    membership_id: string;
+    membership_status: string;
+    next_due_date: string;
+  }> {
+    return request("/payments/renewal/verify/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   // =========================================================
   // Notifications
   // =========================================================

@@ -5,6 +5,8 @@ from .views import (
     PaymentOrderCreateView,
     PaymentSuccessView,
     PaymentVerifyView,
+    RenewalPaymentOrderCreateView,
+    RenewalPaymentVerifyView,
 )
 
 urlpatterns = [
@@ -24,6 +26,18 @@ urlpatterns = [
         "verify/",
         PaymentVerifyView.as_view(),
         name="payment-verify",
+    ),
+
+    path(
+        "renewal/create-order/",
+        RenewalPaymentOrderCreateView.as_view(),
+        name="renewal-payment-create-order",
+    ),
+
+    path(
+        "renewal/verify/",
+        RenewalPaymentVerifyView.as_view(),
+        name="renewal-payment-verify",
     ),
 
     path(

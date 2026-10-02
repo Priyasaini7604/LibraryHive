@@ -32,9 +32,6 @@ class Command(BaseCommand):
             if not due_date:
                 continue
 
-            # -------------------------------------------------
-            # Determine notification type
-            # -------------------------------------------------
             if today <= due_date <= upcoming_date:
                 notification_type = "renewal_upcoming"
 
@@ -54,7 +51,10 @@ class Command(BaseCommand):
                 if membership.status == "active":
                     membership.status = "due"
                     membership.save(
-                        update_fields=["status", "updated_at"]
+                        update_fields=[
+                            "status",
+                            "updated_at",
+                        ]
                     )
 
             elif due_date < today:
@@ -76,19 +76,21 @@ class Command(BaseCommand):
                 if membership.status != "overdue":
                     membership.status = "overdue"
                     membership.save(
-                        update_fields=["status", "updated_at"]
+                        update_fields=[
+                            "status",
+                            "updated_at",
+                        ]
                     )
 
             else:
                 continue
 
-            # -------------------------------------------------
             # Student notification
-            # -------------------------------------------------
             student_exists = Notification.objects.filter(
                 recipient=membership.student,
                 membership=membership,
                 notification_type=notification_type,
+                due_date=due_date,
             ).exists()
 
             if not student_exists:
@@ -99,13 +101,11 @@ class Command(BaseCommand):
                     notification_type=notification_type,
                     title=student_title,
                     message=student_message,
+                    due_date=due_date,
                 )
-
                 created_count += 1
 
-            # -------------------------------------------------
             # Owner notification
-            # -------------------------------------------------
             owner = membership.library.owner
 
             if owner:
@@ -113,6 +113,7 @@ class Command(BaseCommand):
                     recipient=owner,
                     membership=membership,
                     notification_type=notification_type,
+                    due_date=due_date,
                 ).exists()
 
                 if not owner_exists:
@@ -123,8 +124,8 @@ class Command(BaseCommand):
                         notification_type=notification_type,
                         title=owner_title,
                         message=owner_message,
+                        due_date=due_date,
                     )
-
                     created_count += 1
 
         self.stdout.write(

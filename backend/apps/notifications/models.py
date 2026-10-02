@@ -38,15 +38,16 @@ class Notification(BaseModel):
         choices=TYPE_CHOICES,
     )
 
-    title = models.CharField(
-        max_length=255,
-    )
+    title = models.CharField(max_length=255)
 
     message = models.TextField()
 
-    is_read = models.BooleanField(
-        default=False,
+    due_date = models.DateField(
+        null=True,
+        blank=True,
     )
+
+    is_read = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-created_at"]

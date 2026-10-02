@@ -10,6 +10,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             "id",
             "student",
             "booking",
+            "membership",
             "amount",
             "payment_method",
             "status",

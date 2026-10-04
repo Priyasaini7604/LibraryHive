@@ -6,6 +6,7 @@ import {
   SeatStatus,
   User,
   LoginResponse,
+  DomainCount,
 } from "./types";
 import { authStorage } from "./auth";
 
@@ -177,5 +178,13 @@ export const apiClient = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
+  },
+
+  async getSeat(seatId: string): Promise<Seat> {
+    return request<Seat>(`/seats/${seatId}/`);
+  },
+
+  async getDomainBreakdown(libraryId: string): Promise<DomainCount[]> {
+    return request<DomainCount[]>(`/libraries/${libraryId}/domain-breakdown/`);
   },
 };

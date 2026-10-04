@@ -19,6 +19,8 @@ class LibrarySerializer(serializers.ModelSerializer):
     plans = PricingPlanSerializer(many=True, read_only=True)
     domains = serializers.ListField(source="domains_list", read_only=True)
     seat_summary = serializers.SerializerMethodField()
+    starting_price = serializers.SerializerMethodField()
+    domain_breakdown = serializers.SerializerMethodField()
 
     class Meta:
         model = Library
@@ -40,10 +42,34 @@ class LibrarySerializer(serializers.ModelSerializer):
             "domains",
             "plans",
             "seat_summary",
+            "starting_price",
+            "domain_breakdown",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "owner_id", "owner_name", "created_at", "updated_at"]
+
+    def get_starting_price(self, obj):
+        plans = list(obj.plans.all())
+        if plans:
+            return float(min(p.price for p in plans))
+        return None
+
+    def get_domain_breakdown(self, obj):
+        domains = obj.domains_list
+        try:
+            from apps.memberships.models import Membership
+            from django.db.models import Count
+            counts = (
+                Membership.objects.filter(library=obj, status="active")
+                .values("student__domain")
+                .annotate(total=Count("id"))
+            )
+            domain_counts = {item["student__domain"]: item["total"] for item in counts if item["student__domain"]}
+        except Exception:
+            domain_counts = {}
+
+        return [{"domain": d, "count": domain_counts.get(d, 0)} for d in domains]
 
     def get_seat_summary(self, obj):
         seats = Seat.objects.filter(library=obj)

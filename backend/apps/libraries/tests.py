@@ -208,3 +208,40 @@ class LibraryAPITests(TestCase):
         self.assertEqual(res_prox.status_code, status.HTTP_200_OK)
         self.assertEqual(len(res_prox.data["data"]), 1)
         self.assertEqual(res_prox.data["data"][0]["name"], "Connaught Place Study Hub")
+
+    def test_library_explore_details_and_starting_price(self):
+        lib = Library.objects.create(
+            owner=self.owner1,
+            name="Apex Learning Hub",
+            address="Sector 18, Noida",
+            latitude=28.5700,
+            longitude=77.3200,
+            opens_at="08:00:00",
+            closes_at="22:00:00",
+            domains_catered="UPSC,NEET",
+        )
+        PricingPlan.objects.create(library=lib, name="Monthly Standard", duration_days=30, price=1500.00)
+        PricingPlan.objects.create(library=lib, name="Quarterly Pass", duration_days=90, price=4000.00)
+
+        # Public access to explore page
+        res = self.client.get(f"/api/v1/libraries/{lib.id}/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["success"])
+        data = res.data["data"]
+        self.assertEqual(data["name"], "Apex Learning Hub")
+        self.assertEqual(data["starting_price"], 1500.00)
+        self.assertIn("domain_breakdown", data)
+        self.assertEqual(len(data["domain_breakdown"]), 2)
+
+    def test_domain_breakdown_endpoint(self):
+        lib = Library.objects.create(
+            owner=self.owner1,
+            name="Global Study Center",
+            address="Kalu Sarai, New Delhi",
+            domains_catered="JEE,NEET,GATE",
+        )
+        res = self.client.get(f"/api/v1/libraries/{lib.id}/domain-breakdown/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["success"])
+        domains = [item["domain"] for item in res.data["data"]]
+        self.assertEqual(domains, ["JEE", "NEET", "GATE"])

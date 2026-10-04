@@ -65,8 +65,16 @@ export interface Library {
   domains?: string[];
   plans?: PricingPlan[];
   seat_summary?: SeatSummary;
+  starting_price?: number | null;
+  distance_km?: number;
+  domain_breakdown?: Array<{ domain: string; count: number }>;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface DomainCount {
+  domain: string;
+  count: number;
 }
 
 export interface LibraryCreateInput {

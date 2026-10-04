@@ -153,3 +153,11 @@ class SeatAPITests(TestCase):
         self.assertEqual(data[0]["status"], "empty")
         self.assertEqual(data[1]["label"], "Row A - Seat 2")
         self.assertEqual(data[1]["status"], "occupied")
+
+    def test_public_can_view_single_seat_detail(self):
+        seat = Seat.objects.create(library=self.library1, label="Row C - Seat 5", status="empty")
+        res = self.client.get(f"/api/v1/seats/{seat.id}/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["success"])
+        self.assertEqual(res.data["data"]["label"], "Row C - Seat 5")
+        self.assertEqual(res.data["data"]["status"], "empty")

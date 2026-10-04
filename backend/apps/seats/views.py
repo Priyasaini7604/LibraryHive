@@ -106,12 +106,17 @@ class LibrarySeatsView(generics.GenericAPIView):
 
 class SeatDetailView(generics.RetrieveUpdateAPIView):
     """
+    GET /seats/{id}/: Public inspection of seat details.
     PATCH /seats/{id}/: Owner can manually override seat status or label.
     """
     queryset = Seat.objects.all()
     serializer_class = SeatSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwner, IsLibraryOwnerOf]
     lookup_field = "id"
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsOwner(), IsLibraryOwnerOf()]
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

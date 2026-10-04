@@ -190,3 +190,33 @@ class OwnerLibraryMeView(generics.GenericAPIView):
             "data": serializer.data,
             "error": None,
         })
+
+
+class LibraryDomainBreakdownView(generics.GenericAPIView):
+    """
+    GET /libraries/{id}/domain-breakdown/:
+    Public domain-wise member count for a library (FR-12, FR-04).
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, id):
+        library = get_object_or_404(Library, id=id)
+        domains = library.domains_list
+        try:
+            from apps.memberships.models import Membership
+            from django.db.models import Count
+            counts = (
+                Membership.objects.filter(library=library, status="active")
+                .values("student__domain")
+                .annotate(total=Count("id"))
+            )
+            domain_counts = {item["student__domain"]: item["total"] for item in counts if item["student__domain"]}
+        except Exception:
+            domain_counts = {}
+
+        data = [{"domain": d, "count": domain_counts.get(d, 0)} for d in domains]
+        return Response({
+            "success": True,
+            "data": data,
+            "error": None,
+        })

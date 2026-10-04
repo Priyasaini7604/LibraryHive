@@ -65,6 +65,8 @@ export interface Library {
   domains?: string[];
   plans?: PricingPlan[];
   seat_summary?: SeatSummary;
+  /** Only present when the list is requested with lat, lng and radius. */
+  distance_km?: number;
   created_at?: string;
   updated_at?: string;
 }

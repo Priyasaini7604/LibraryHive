@@ -238,7 +238,7 @@ export default function LibraryExplorePage() {
             <DomainBreakdown />
           </div>
 
-          <SeatMapSection seatSummary={library.seat_summary} />
+          <SeatMapSection libraryId={library.id} />
         </div>
       </>
     );

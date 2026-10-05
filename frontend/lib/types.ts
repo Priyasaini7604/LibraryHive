@@ -178,3 +178,17 @@ export interface Notification {
   created_at?: string;
   updated_at?: string;
 }
+
+/**
+ * Contract for the planned "current members by domain" endpoint
+ * (not implemented in the backend yet). Aggregates only, no student data.
+ */
+export interface DomainBreakdownItem {
+  domain: string;
+  count: number;
+}
+
+export interface DomainBreakdown {
+  total_members: number;
+  breakdown: DomainBreakdownItem[];
+}

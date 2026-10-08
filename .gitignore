@@ -1,16 +1,34 @@
-# Backend
-backend/venv/
-backend/__pycache__/
-backend/*.pyc
+# Secrets and local configuration (never commit)
+.env
+.env.*
+!.env.example
 backend/.env
+frontend/.env.local
+
+# Backend
+.venv/
+backend/venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
 backend/db.sqlite3
-backend/*.log
+backend/media/
+backend/staticfiles/
+.coverage
+htmlcov/
 
 # Frontend
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
+frontend/out/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
 
 # General
 *.log
 .DS_Store
+Thumbs.db
+.idea/

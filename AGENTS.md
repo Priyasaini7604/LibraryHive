@@ -1,6 +1,6 @@
 # LibraryHive — Agent & Developer Engineering Guidelines
 
-**Document Version:** 1.2 (aligned with ARCHITECTURE.md, SPEC.md, BACKEND_ARCHITECTURE.md and UI_ARCHITECTURE.md, 2026-10-09)  
+**Document Version:** 1.3 (aligned with all approved phase documents and decision D19, 2026-10-09)  
 **Applies To:** All Software Engineers, Technical Contributors, and AI Coding Agents  
 **Target Repositories:** `LibraryHive` (Backend: Django/DRF, Frontend: Next.js/TypeScript)  
 **Status:** Mandatory Engineering Contract  
@@ -229,8 +229,13 @@ python manage.py test apps.accounts apps.libraries apps.seats apps.memberships a
 
 ## 10. Git, Branching & Commit Conventions
 
+- `main` is the only long-lived branch and the stable integration branch. All work happens on short-lived branches merged through reviewed PRs.
+- Shared-repository operations (push, PR creation by automation, merge into `main`, deleting remote branches or tags, history rewrites, force-push) require explicit confirmation from the project lead. History of shared branches is never rewritten.
+- Local PostgreSQL runs in Docker (`docker-compose.yml`); see `README.md`.
+
 - **Branch Naming:**
-  - `feat/<module-name>` (e.g. `feat/membership-offline-admission`)
+  - `feature/<task-name>` as listed in `IMPLEMENTATION_PLAN.md` §4 (e.g. `feature/platform-foundation`, `feature/seat-holds`)
+  - `chore/<topic>` for repository maintenance (e.g. `chore/legacy-cleanup`)
   - `fix/<issue-name>` (e.g. `fix/seat-concurrency-lock`)
   - `docs/<doc-name>` (e.g. `docs/api-spec-update`)
 - **Commit Messages:** Follow Conventional Commits:

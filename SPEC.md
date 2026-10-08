@@ -593,6 +593,8 @@ There is at most one pending request per student per library. No calendar or slo
 
 ## 5. Migration from the current schema
 
+> **Superseded by D19 (2026-10-09):** the implementation starts fresh. Every app gets a new `0001` migration created from this specification, and existing local databases are discarded (the Docker PostgreSQL starts empty). The table below is kept only as a record of legacy schema patterns that must not reappear.
+
 There is no production data. The current DB contains only seed and demo data, so migrations are written as normal forward migrations from the existing chain (no reset, so existing teammates' DBs keep working). The seed command is rewritten to match.
 
 | Current (`PROJECT_AUDIT.md` §4) | Migration |

@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Date:** 2026-10-09
-**Status:** **APPROVED** (2026-10-09). Decisions D15 and the external-dependency notes recorded on 2026-10-09; T00 revised after the pre-Phase-8 delta audit (`PROJECT_AUDIT.md` §28).
+**Status:** **APPROVED** (2026-10-09). Later decisions recorded on 2026-10-09: D15 (team), external-dependency notes, and **D19: fresh implementation from the approved design** (legacy application code retired; see T00 and §5).
 **Builds on (all approved):** `FEATURES.md` v2.2 · `ARCHITECTURE.md` · `SPEC.md` v2.0 · `BACKEND_ARCHITECTURE.md` (endpoint numbers `#n`) · `UI_ARCHITECTURE.md` · `SECURITY.md` (SEC-1 approved)
 
 This plan says **who builds what, in which order, and how we know it is done**. No code is written in this phase.
@@ -16,7 +16,7 @@ This plan says **who builds what, in which order, and how we know it is done**. 
 3. **Dependency order, P0 before P1.** P1 items in a module start only after that module's P0 items are done.
 4. **No stubs, no fake data in product code** (AGENTS §1.3). If a dependency is not ready, the dependent feature waits or is merged without that part. It never ships a placeholder value. Test doubles are allowed only in tests (gateway, email).
 5. **Every task ends green:** tests, lint, type check and build pass, and the task's checklist in `ARCHITECTURE.md` §23.1 (old code removed) is done.
-6. **Each existing working module is restructured in place, not rewritten from scratch** (preserve the 16 existing tests' intent, adapted to the new contract).
+6. **Fresh implementation from the approved design (D19, 2026-10-09).** The application code written before the approved design is retired (preserved in `legacy/*` tags). Every module is built from `SPEC.md`, `BACKEND_ARCHITECTURE.md` and `UI_ARCHITECTURE.md`. A legacy piece may be reused only if it is explicitly verified against the approved contract and the reuse is stated in the PR description.
 
 ---
 
@@ -130,68 +130,67 @@ flowchart LR
 
 ## 4. Tasks
 
-Branch names follow `AGENTS.md` §10 (`feat/<module>`). Every task's tests run against **PostgreSQL**.
+Branch names follow `AGENTS.md` §10: **`feature/<task-name>`** (one short-lived branch per task, from the latest `main`, deleted after merge), `fix/<issue>` for fixes, `docs/<doc>` for documentation, `chore/<topic>` for repository maintenance. Every task's tests run against **PostgreSQL**.
 
 ### Stage 0 — Foundation
 
-#### T00 Repository reconciliation and urgent fixes · P1 · M (revised 2026-10-09 after `PROJECT_AUDIT.md` §28)
-GitHub `main` gained 17 commits after Phase 0, local `main` has 2 unpushed commits, and they conflict in 4 files. T00 is now a reconciliation task done **without rewriting any shared history** (merge, not rebase or force-push).
+#### T00 Legacy cleanup and repository reset · P1 · S · `chore/legacy-cleanup` (revised 2026-10-09 by D19)
+The application code from before the approved design is **retired, not reconciled** (D19). Nothing from it is merged into the new implementation.
 
-| Step | Action | Touches the shared repository? |
+| Step | Action | Shared repository? |
 |---|---|---|
-| 0a | Local branch `chore/reconcile-main` created from `origin/main` | No (local) |
-| 0b | Merge local `main` (Person B's 2 commits) into it; resolve the 4 conflicts per decision G1; commit the SRS `.md` and all phase documents | No (local) |
-| 0c | **Urgent fixes** (decision G2): remove `PaymentSuccessView` and its route (N1); make `Payment.amount` read-only and stop accepting client amounts (N2); add the missing `seats` migration dependencies so a fresh `migrate` works (N3); give the Razorpay settings safe defaults for local development and list them in `.env.example` (N4); restrict `POST /bookings/expire/` to staff until T12 replaces it (N5); remove stray files and untrack `tsconfig.tsbuildinfo` (N7) | No (local) |
-| 0d | Verify: fresh `migrate` on PostgreSQL, all existing tests pass, a new regression test proves `/payments/{id}/success/` is gone and amount tampering is rejected, `next build` passes | No (local) |
-| 0e | **Push `chore/reconcile-main` and open a PR to `main`** | **Yes: requires your explicit confirmation first** |
-| 0f | After the PR is merged, fast-forward local `main` to `origin/main` | No (local) |
-| 0g | Remote branch clean-up (merged branches `person-c-booking-payment-membership`, `feature/fr-03-discovery`; unmerged `complaints-work`, `feature/fr-04-explore`, `feature/fr-05-seat-map` kept until their content is absorbed by T21 and T16) | **Yes: only on your explicit confirmation, branch by branch** |
+| 0a | Annotated `legacy/*` tags on every legacy head: `legacy/main-2026-10-05` (c54717d), `legacy/local-main-person-b-2026-10-04` (944478b, never pushed), `legacy/complaints-work`, `legacy/feature-fr-03-discovery`, `legacy/feature-fr-04-explore`, `legacy/feature-fr-05-seat-map`, `legacy/person-c-booking-payment-membership` | Local; **pushing the tags needs confirmation** |
+| 0b | Branch `chore/legacy-cleanup` from `origin/main`: commit the approved documents; remove all legacy application code (`backend/`, `frontend/`); add the Docker PostgreSQL setup, `.env.example`, `.gitignore` and `README.md` | Local |
+| 0c | Push the tags, then push `chore/legacy-cleanup` and open a PR to `main` | **Confirmation required (each)** |
+| 0d | Review and merge the PR into `main` | **Confirmation required** |
+| 0e | Delete the legacy remote branches, one at a time, **after** their tags are on GitHub | **Confirmation required immediately before each deletion** |
+| 0f | Local: point `main` at the new `origin/main`; keep the local `docs/phase-0-7-snapshot` branch until the PR is merged | Local |
 
-- **Dependencies:** decisions G1 and G2 (§9). **Tests:** regression tests in 0d.
-- **DoD:** one reconciled `main` on GitHub containing everyone's work and the documents; fresh clone migrates and passes tests; N1 to N5 and N7 fixed; no history rewritten; no branch deleted without confirmation.
+- **Dependencies:** none. **Tests:** `docker compose config` validates; the database container starts and passes its health check.
+- **DoD:** `main` contains only the approved documents and the local-development setup; every legacy head is reachable through a `legacy/*` tag on GitHub; no history rewritten; no branch deleted without confirmation.
 
-#### T01 Backend foundation · P1 · L · `feat/core-foundation`
+#### T01 Backend foundation · P1 · L · `feature/platform-foundation`
 - **Backend files:** `config/settings/{base,local,test,production}.py`, `config/urls.py` (only `/api/v1/`), `requirements.txt`, `requirements-dev.txt`, `backend/.env.example`; `apps/core/`: `models.py` (Domain, Amenity, AuditLog), `exceptions.py`, `handlers.py`, `responses.py`, `pagination.py`, `permissions.py`, `mixins.py`, `middleware.py` (request ID, access log), `logging.py` (JSON + redaction), `audit.py`, `storage.py`, `images.py`, `dates.py`, `views.py` (#1 health, #2–#3 meta, #5 schema).
 - **DB:** new tables `core_domain`, `core_amenity` (+ data migration seeding the vocabularies from SPEC §3.3), `core_auditlog`.
 - **APIs:** #1, #2, #3, #5.
 - **Config:** DRF defaults (IsAuthenticated, exception handler, pagination, throttle rates and DB cache), SimpleJWT settings (§SECURITY 4.1), CORS/hosts/HTTPS from env, production startup guard, `TIME_ZONE=Asia/Kolkata`, `DATA_UPLOAD_MAX_MEMORY_SIZE`.
-- **Removes (old code):** global-freeze `requirements.txt`, hardcoded settings, SQLite default, `/api/` duplicate mount.
+- **Must not reappear (legacy patterns):** global-freeze `requirements.txt`, hardcoded settings, SQLite default, `/api/` duplicate mount.
 - **Tests:** envelope for success, validation, 401, 403, 404, 429, 500; constraint→409 mapping; redaction filter; request ID header; production guard refuses unsafe settings; image pipeline (oversize, fake JPG, SVG, bomb, EXIF stripped); **route-inventory test** (fails on unexpected `AllowAny`).
-- **DoD:** existing 16 tests still pass (adapted to the envelope); `makemigrations --check` clean; documented local PostgreSQL setup works on Windows and Linux.
+- **DoD:** `makemigrations --check` clean; backend starts against the Docker PostgreSQL from the T00 setup; documented local PostgreSQL setup works on Windows and Linux.
 
-#### T02 CI skeleton · P1 · S · `feat/ci-skeleton`
+#### T02 CI skeleton · P1 · S · `feature/ci-pipeline`
 - **Files:** `.github/workflows/ci.yml`.
 - **Do:** backend job (ruff, `makemigrations --check --dry-run`, `manage.py test` with a PostgreSQL service); frontend job (lint, `tsc --noEmit`, `next build`). Branch protection on `main` requiring CI and one review. (Deployment workflows and the rest of CI/CD come in Phase 11.)
 - **Dependencies:** T01, T03.
 - **DoD:** a PR with a failing test cannot be merged.
 
-#### T03 Frontend foundation · P1 · L · `feat/frontend-foundation`
+#### T03 Frontend foundation · P1 · L · `feature/frontend-foundation`
 - **Frontend files:** `package.json` (dependencies in UI §15), `tailwind.config.ts`, `postcss.config`, `app/globals.css` (tokens), `app/layout.tsx` (font, providers), `app/global-error.tsx`, `app/not-found.tsx`, `next.config.mjs` (**rewrite `/api/v1/auth/*` to the backend for SEC-1**, security headers and CSP from SECURITY §8), `tsconfig.json` (`strict: true`), ESLint config, Vitest config; `components/ui/*` (full kit, UI §2.3), `components/layout/*` (PublicShell, StudentShell, OwnerShell, AuthGuard); `lib/api-client.ts`, `lib/auth.ts`, `lib/auth-context.tsx` (in-memory access token, refresh on load), `lib/query-keys.ts`, `lib/errors.ts`, `lib/format.ts`, `lib/types.ts`, `lib/api-types.gen.ts` + generation script; `frontend/.env.example`.
-- **Removes:** inline-styled header in `layout.tsx`, `declarations.d.ts`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `/api` base URL.
+- **Must not reappear (legacy patterns):** inline-styled header in `layout.tsx`, `declarations.d.ts`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `/api` base URL.
 - **Dependencies:** T00 (T04's auth endpoints for the full refresh flow; until then the AuthProvider is tested with unit tests only).
 - **Tests:** api-client (envelope unwrap, single-flight refresh on 401, error mapping, server time offset); AuthGuard redirects; UI kit components with `axe`.
 - **DoD:** shells render at all six viewports; lint (incl. `jsx-a11y`, `no-explicit-any`) and build pass.
 
 ### Stage 1 — Identity
 
-#### T04 Accounts and authentication · P1 · M · `feat/accounts-auth`
+#### T04 Accounts and authentication · P1 · M · `feature/auth`
 - **Backend:** `apps/accounts/` `models.py` (User changes, SPEC §3.1), `phone.py` (`normalize_phone`), `services.py` (`register`, `login`, `logout`, `update_profile`, `find_identity`), `selectors.py`, `serializers.py`, `views.py`, `urls.py`, `admin.py`.
 - **DB:** migration: `updated_at`, `is_offline`, `claimed_at`, `domain` FK (data-migrate the free-text domain), phone E.164 + unique, email nullable + checks; `token_blacklist` tables.
 - **APIs:** #6–#11 with the refresh cookie (SEC-1), `CLAIM_REQUIRED` and `IDENTITY_CONFLICT` behaviour.
 - **Tests:** register owner and student; duplicate email and phone; password validators; generic login failure; throttling; refresh rotation and reuse rejected; logout blacklists and clears cookie; cookie flags (`HttpOnly`, `Secure`, `SameSite=Strict`, path); `Origin` check on cookie endpoints; register matching an offline record returns `CLAIM_REQUIRED`; deactivated user rejected.
 - **DoD:** all auth security tests in SECURITY §20 "Auth" pass.
 
-#### T05 Password reset · P1 · S · `feat/password-reset`
+#### T05 Password reset · P1 · S · `feature/password-reset`
 - **Backend:** `AccountClaim` model (all three channels), `services.request_password_reset` / `confirm_password_reset`, email templates; APIs **#13a, #13b**.
 - **Tests:** SECURITY §20 one-time-code tests; neutral responses; all refresh tokens blacklisted after reset; offline records get no email.
 - **Dependencies:** T04.
 
-#### T06 Offline account claim · P1 · M · `feat/account-claim`
+#### T06 Offline account claim · P1 · M · `feature/account-claim`
 - **Backend:** `start_claim`, `complete_claim`, `issue_claim_code` services; APIs **#12, #13**. Tests create offline users directly through the model factory until T15 provides admissions.
 - **Tests:** claim via email OTP and via owner code; wrong, expired, reused, locked codes; same `User.id` kept and history visible; never matches by name; conflicting identity rejected.
 - **T06b** (after T15): API **#55** owner claim-code issuance; tests that only offline students with a membership in the owner's library qualify (others 404).
 
-#### T07 Auth and profile screens · P1 · M · `feat/auth-ui`
+#### T07 Auth and profile screens · P1 · M · `feature/auth-ui`
 - **Frontend:** `app/(auth)/login`, `register`, `claim`, `forgot-password`, `reset-password`; `student/profile`, `owner/profile`; `lib/api/auth.ts`, `lib/schemas/auth.ts`.
 - **Dependencies:** T03, T04, T05, T06.
 - **Tests:** form validation and server error mapping; `?next=` accepts only relative paths; Playwright: register → login → logout; claim flow.
@@ -199,34 +198,34 @@ GitHub `main` gained 17 commits after Phase 0, local `main` has 2 unpushed commi
 
 ### Stage 2 — Library and seats
 
-#### T08 Libraries and pricing plans · P2 · M · `feat/libraries`
+#### T08 Libraries and pricing plans · P2 · M · `feature/library-management`
 - **Backend:** `apps/libraries/` `models.py` (Library and PricingPlan changes, SPEC §3.5, §3.7), `services.py` (`create_library`, `update_library`, plan CRUD, `refresh_publish_state`), `selectors.py` (public list with bounding box, detail, `starting_price`, seat counts via `seats.selectors`), serializers (owner vs public output), views, urls.
 - **DB:** add description, city, area, decimal coordinates (0,0 → NULL), M2M domains (data-migrate `domains_catered`) and amenities, `is_published`, `published_at`, `is_active`, `operating_notes` rename, drop `total_seats`, owner FK to PROTECT; plan `timing_note`, `is_active`, checks, partial unique name.
 - **APIs:** #14, #15 (without `domain_breakdown` until T23 adds it; **the field is omitted, not faked**), #17–#24.
-- **Removes:** nested `pricing_plans` / `initial_seats` / `seat_layout` handling, `libraries/me`, domain-breakdown duplicates, silent `except Exception` blocks.
-- **Tests:** existing library tests adapted; publish rules; plan deactivation keeps referenced plans; coordinates validation; discovery filters, radius and sorting; query count does not grow per library; isolation (§SECURITY 6.4).
+- **Must not reappear (legacy patterns):** nested `pricing_plans` / `initial_seats` / `seat_layout` handling, `libraries/me`, domain-breakdown duplicates, silent `except Exception` blocks.
+- **Tests:** library create/edit/permission tests (written fresh against the contract); publish rules; plan deactivation keeps referenced plans; coordinates validation; discovery filters, radius and sorting; query count does not grow per library; isolation (§SECURITY 6.4).
 
-#### T09 Library photos · P2 · M · `feat/library-photos`
+#### T09 Library photos · P2 · M · `feature/library-photos`
 - **Backend:** `LibraryPhoto` model, `upload_photo`, `delete_photo`, `set_cover`, `update_photo`; APIs #25–#29; photos in #14 (cover thumbnail) and #15.
 - **DB:** `libraries_libraryphoto` with the one-cover partial unique.
 - **Dependencies:** T01 (images and storage), T08.
 - **Tests:** 15-photo limit under concurrency; one cover; delete cover reassigns; storage objects removed only after commit; another owner's photo gives 404; upload security tests.
 
-#### T10 Seat configuration and derived seat map · P2 · M · `feat/seat-config`
+#### T10 Seat configuration and derived seat map · P2 · M · `feature/seat-management`
 - **Backend:** `apps/seats/` `models.py` (Seat changes, SPEC §3.8), `services.py` (`create_seats`, `update_seat`, `deactivate_seat`, `set_disabled`), `selectors.py` (`seat_map` with derived status, counts), views, urls.
 - **DB:** drop `status`; add `row_label`, `position` (backfilled by parsing existing labels), `is_active`, `is_disabled`, `disabled_reason`; partial unique label.
 - **APIs:** #16, #30–#35.
 - **Dependencies:** T08; **T11** (needs `memberships.selectors.active_membership_exists` for the Occupied status).
-- **Removes:** client-writable status, `seats/library/{id}/` route, PUT alias, duplicated seat-creation logic.
-- **Tests:** existing seat tests adapted; grid generation never resets existing seats; cannot deactivate or disable a seat in use; public map never exposes identities; isolation.
+- **Must not reappear (legacy patterns):** client-writable status, `seats/library/{id}/` route, PUT alias, duplicated seat-creation logic.
+- **Tests:** seat configuration tests (written fresh against the contract); grid generation never resets existing seats; cannot deactivate or disable a seat in use; public map never exposes identities; isolation.
 
-#### T11 Membership model and selectors · P3 · S · `feat/membership-model`
+#### T11 Membership model and selectors · P3 · S · `feature/membership-model`
 - **Backend:** `Membership` model (SPEC §3.10), `selectors.py` (`annotate_status`, `active_membership_exists(seat)`, `student_is_member(student, library)`, `current_membership(student, library)`), admin.
 - **DB:** `memberships_membership` with partial uniques and checks.
 - **Why early:** unblocks T10, T12, T20, T21 without waiting for admission and payments.
 - **Tests:** derived status at the boundaries (today+3, today, yesterday, archived) in Asia/Kolkata; constraints reject a second active membership per seat and per student-library.
 
-#### T12 Seat holds (booking start) · P2 · M · `feat/seat-holds`
+#### T12 Seat holds (booking start) · P2 · M · `feature/seat-holds`
 - **Backend:** `SeatHold` model, `create_booking_hold`, `cancel_hold`, `place_manual_hold`, `release_hold`, `expire_dead_holds` (+ scheduled step `expire_holds`); APIs #36–#40.
 - **DB:** `seats_seathold` with partial uniques and checks.
 - **Dependencies:** T10, T11, T13 (notification to the student when the owner releases their hold).
@@ -234,83 +233,83 @@ GitHub `main` gained 17 commits after Phase 0, local `main` has 2 unpushed commi
 
 ### Stage 3 — Membership and payments
 
-#### T13 Notifications engine · P4 · M · `feat/notifications-core`
+#### T13 Notifications engine · P4 · M · `feature/notifications`
 - **Backend:** `apps/notifications/` `Notification`, `NotificationDelivery` models, `services.notify()` (dedup key, `ignore_conflicts`, delivery row creation), selectors, APIs #58–#61, email sender abstraction.
 - **DB:** both tables with unique `dedup_key` and `(notification, channel)`.
 - **Why early (stage 1):** every other app calls `notify()`.
 - **Tests:** dedup (insert 5×, one row); recipient isolation; unread count; mark read is idempotent.
 
-#### T14 Payments and booking confirmation · P3 · L · `feat/payments`
+#### T14 Payments and booking confirmation · P3 · L · `feature/payments`
 - **Backend:** `apps/payments/` `Payment`, `PaymentWebhookEvent` models, receipt sequence migration, `gateway.py` (Razorpay adapter), `services.py` (`create_order`, `verify_checkout`, `handle_webhook`, `confirm_payment`, `reconcile_stale_orders`), selectors (history, ledger), views, urls; `memberships.services.activate_from_hold`.
 - **APIs:** #41 (new booking part), #42, #43, #44–#47.
 - **Dependencies:** T11, T12, T13; Razorpay **test-mode keys** (D2) to run the manual staging check (automated tests use the fake gateway).
 - **Tests:** SECURITY §10.5 (forged signatures, another student's order, amount tampering, replayed webhooks, verify-vs-webhook race, late capture after hold expiry → confirm or `needs_refund`); idempotency; reconciliation; isolation; envelope on gateway errors (502).
 - **DoD:** a real test-mode payment on a local or staging environment completes and creates exactly one membership.
 
-#### T15 Admission, renewal and archival · P3 · L · `feat/membership-lifecycle`
+#### T15 Admission, renewal and archival · P3 · L · `feature/membership-lifecycle`
 - **Backend:** `memberships.services` `admit_offline_student`, `apply_renewal`, `archive_membership`; `payments.services.record_offline_payment`; dues selector; APIs #41 (renewal part), #48–#54, #56, #57.
 - **Dependencies:** T04 (`find_identity`), T10, T11, T14.
 - **Tests:** admission creates or links the user per the SPEC §4.6 table (new, existing, conflict, owner identity); admission vs online booking race on one seat (one wins); manual hold consumed by its owner's admission; renewal date arithmetic (on time, early, overdue ≤ 15 days, > 15 days) and renewal window (`RENEWAL_NOT_OPEN`); archival frees the seat and keeps history; dues sorted by days overdue; isolation.
 
 ### Stage 4 — Operations
 
-#### T20 Attendance · P4 · M · `feat/attendance`
+#### T20 Attendance · P4 · M · `feature/attendance`
 - **Backend:** `AttendanceRecord` model, `check_in`, `check_out`, `auto_close_open_records` (+ scheduled step), P1-priority owner corrections; APIs #62–#67 (P0), #68–#70 (P1).
 - **Dependencies:** T11, T13.
 - **Tests:** one open record (double-tap concurrency); check-out without check-in; archived member rejected; check-in at another library rejected; auto-close at closing time; isolation.
 
-#### T21 Complaints · P4 · S · `feat/complaints`
+#### T21 Complaints · P4 · S · `feature/complaints`
 - **Backend:** `Complaint` model and services; APIs #71–#76 (image upload P1).
 - **Dependencies:** T11, T13.
 - **Tests:** only members (current or past) of the library can complain; transitions; response required to resolve; notifications; isolation.
 
-#### T22 Visits · P2 · S · `feat/visits`
+#### T22 Visits · P2 · S · `feature/visits`
 - **Backend:** `VisitRequest` model and services; APIs #77–#81. **Frontend:** visit dialog on the library page, `student/visits`, `owner/visits`.
 - **Dependencies:** T08, T13, T16.
 - **Tests:** one pending per library; date range; transitions; notifications; isolation.
 
-#### T23 Analytics, dashboards and exports · P4 · M · `feat/analytics`
+#### T23 Analytics, dashboards and exports · P4 · M · `feature/analytics`
 - **Backend:** `apps/analytics/selectors.py` (owner dashboard, student dashboard, domain breakdown, occupancy, revenue, complaints), CSV writers; APIs #82–#89; adds `domain_breakdown` to #15 (coordinated PR with P2).
 - **Dependencies:** T15, T20, T21, T22.
 - **Tests:** each dashboard number equals its list's count (two libraries present); revenue counts successful payments only; CSV injection escaping; exports scoped to the library; audit-log view scoped and without IP.
 
-#### T24 Scheduled jobs and email delivery · P4 · M · `feat/scheduled-jobs`
+#### T24 Scheduled jobs and email delivery · P4 · M · `feature/scheduled-jobs`
 - **Backend:** `run_scheduled_jobs` command (orchestrator, `--only`, `--dry-run`, non-zero exit on failure), steps `renewal_notifications`, `owner_summaries`, `send_emails` (backoff, attempts), wiring of P2's `expire_holds`, P3's `reconcile_payments`, P4's `auto_close_attendance`; API #4 (job trigger, disabled unless the token is set).
 - **Dependencies:** T12, T14, T15, T20, T13.
 - **Tests:** run 5× → one notification per milestone; owner summary once per library per day; email retry and backoff; a failing step does not stop later steps; exit code.
 
 ### Stage 5 — Frontend screens
 
-#### T16 Public screens and seat map · P2 · L · `feat/public-ui`
+#### T16 Public screens and seat map · P2 · L · `feature/public-ui`
 - **Frontend:** `app/(public)/page.tsx` (landing), `discover/`, `libraries/[id]/`; `components/seat-map/*` (SeatMap, legend, a11y grid, list view), `components/library/*` (LibraryCard, LibraryMap, LocationPicker, PhotoGallery, Lightbox); `lib/geocode.ts`; `lib/api/libraries.ts`, `lib/api/seats.ts`; booking panel up to hold creation (navigates to P3's checkout).
-- **Removes:** `app/student/discover/`, `app/student/library/[id]/`, `components/seat-map/SeatGrid.tsx`, `components/charts/DomainChart.tsx` (replaced by P4's `DomainBars`), city presets, hardcoded amenities and shifts, `alert()` booking.
+- **Must not reappear (legacy patterns):** `app/student/discover/`, `app/student/library/[id]/`, `components/seat-map/SeatGrid.tsx`, `components/charts/DomainChart.tsx` (replaced by P4's `DomainBars`), city presets, hardcoded amenities and shifts, `alert()` booking.
 - **Dependencies:** T03, T08, T09, T10, T12.
 - **Tests:** SeatMap states, keyboard navigation and screen-reader labels; booking panel handles `SEAT_UNAVAILABLE`, `HOLD_EXISTS`, `ALREADY_MEMBER`; login round-trip keeps the selection; Playwright: discover → library → select seat → hold.
 
-#### T17 Owner onboarding, library settings and seat manager · P2 · L · `feat/owner-library-ui`
+#### T17 Owner onboarding, library settings and seat manager · P2 · L · `feature/owner-library-ui`
 - **Frontend:** `owner/onboarding/` (7 steps), `owner/library/` (Profile · Plans · Photos tabs sharing step components), `owner/seats/` (owner-mode SeatMap, side panel actions, add-seats dialog), `components/owner/PublishChecklist`.
-- **Removes:** `app/owner/setup/page.tsx`.
+- **Must not reappear (legacy patterns):** `app/owner/setup/page.tsx`.
 - **Dependencies:** T03, T08, T09, T10, T12.
 - **Tests:** wizard resumes at the first incomplete step; unsaved-changes warning; seat actions per status; Playwright: owner registers → onboarding → library live.
 
-#### T18 Checkout and renewal · P3 · M · `feat/checkout-ui`
+#### T18 Checkout and renewal · P3 · M · `feature/checkout-ui`
 - **Frontend:** `student/book/[holdId]/`, `student/memberships/[id]/renew/`, `components/booking/*` (HoldCountdown, PaymentSummary, RazorpayButton, PlanPicker), `lib/razorpay.ts`, `lib/api/payments.ts`.
 - **Dependencies:** T14, T15, T16.
 - **Tests:** checkout state machine (UI §5.3) including `confirming_slow` polling by `order_id`, `dismissed`, `expired`, `seat_lost`; countdown uses server offset; manual staging check with Razorpay test mode (success, failure, dismissed, UPI).
 
-#### T19 Membership, admission, dues and payments screens · P3 · L · `feat/membership-ui`
+#### T19 Membership, admission, dues and payments screens · P3 · L · `feature/membership-ui`
 - **Frontend:** `student/memberships/`, `student/payments/` (+ printable receipt), `owner/members/` (+ detail with archive and record-renewal dialogs), `owner/members/new` (admission with identity lookup and claim-code display), `owner/dues/`, `owner/payments/`; `lib/api/memberships.ts`.
 - **Dependencies:** T06b, T15, T17 (seat picker), T03.
 - **Tests:** admission identity states (none, existing, conflict); claim code shown once; archive confirmation; tables collapse to cards on mobile; Playwright: owner admits an offline student with cash.
 
-#### T25 Operations screens · P4 · L · `feat/ops-ui`
+#### T25 Operations screens · P4 · L · `feature/operations-ui`
 - **Frontend:** `student/page.tsx` (dashboard), `owner/page.tsx` (dashboard), `student/attendance/`, `owner/attendance/`, `student/complaints/*`, `owner/complaints/*`, `student|owner/notifications/`, `owner/reports/`, `owner/activity/` (P1), `components/charts/*` (StatCard, OccupancyBar, DomainBars), `components/attendance/*`, `components/notifications/*` (bell in both shells, via a PR to P1's shells).
 - **Dependencies:** T13, T20, T21, T23, T03.
 - **Tests:** dashboard cards link to matching lists; check-in button states; complaint transitions; notification bell count; CSV download.
 
 ### Stage 6 — Integration
 
-#### T26 Integration and hardening · P1 coordinates, all four contribute · M · `feat/integration`
+#### T26 Integration and hardening · P1 coordinates, all four contribute · M · `feature/integration`
 - **Do:**
   - `seed_demo` command (each app's `seed.py`; realistic demo data created through services, clearly labelled as demo and never loaded in production).
   - Full end-to-end runs of every primary workflow (SRS §7) on PostgreSQL.
@@ -323,23 +322,19 @@ GitHub `main` gained 17 commits after Phase 0, local `main` has 2 unpushed commi
 
 ---
 
-## 5. Existing code disposition (who removes what)
+## 5. Legacy code (D19)
 
-| Existing item (PROJECT_AUDIT) | Owner | Task |
-|---|---|---|
-| `requirements.txt` (global freeze), `config/settings.py`, `/api/` mount, empty `.env.example` | P1 | T01 |
-| `apps/accounts/*` (register, login, me) | P1 | T04 (restructured in place) |
-| `apps/core/permissions.py` (`IsLibraryOwnerOf`) | P1 | T01 (replaced by scoped mixins; kept only if still used) |
-| `apps/libraries/*` (nested create/update serializers, `me`, domain breakdown) | P2 | T08 |
-| `apps/libraries/management/commands/seed_libraries.py` | P1 | T26 (replaced by `seed_demo`) |
-| `apps/seats/*` (static status, duplicate route) | P2 | T10 |
-| Empty stubs `apps/memberships`, `apps/payments`, `apps/complaints` | P3 / P3 / P4 | T11 / T14 / T21 |
-| `frontend/app/layout.tsx`, `globals.css`, `lib/*`, `tsconfig.json`, `declarations.d.ts`, tracked `tsconfig.tsbuildinfo` | P1 | T00, T03 |
-| `frontend/app/student/discover`, `student/library/[id]`, `components/seat-map/SeatGrid.tsx` | P2 | T16 |
-| `frontend/components/charts/DomainChart.tsx` | P4 | T25 (as `DomainBars`) |
-| `frontend/app/owner/setup/page.tsx` | P2 | T17 |
+All application code that existed before the approved design is removed in **T00** and preserved only in the `legacy/*` tags. No task restructures or merges it. The "Must not reappear" bullets in §4 list legacy patterns that a reviewer must reject if they show up again, in particular:
 
----
+- the fake payment-success endpoint and any other temporary or test endpoint in product code;
+- client-controlled payment amounts;
+- stored or client-writable seat status (status is derived, SPEC §4.1) and the `Booking` model (replaced by `SeatHold`);
+- duplicate API mounts and routes (`/api/` next to `/api/v1/`, `seats/library/{id}/`);
+- migrations with missing cross-app dependencies (every app starts with a fresh `0001` migration);
+- hardcoded secrets, demo credentials and fake frontend data (amenities, shifts, `alert()` actions);
+- inline-styled pages and the global-freeze `requirements.txt`.
+
+**Reuse rule:** a developer may consult the legacy tags for ideas, but code is copied only if it is verified against the approved contract, and the PR states what was reused and how it was checked.
 
 ## 6. Global Definition of Done (every task)
 
@@ -362,7 +357,7 @@ A task is done only when **all** of these hold (AGENTS §12, FEATURES §1):
 
 | Topic | Rule |
 |---|---|
-| Branches & commits | `feat/<module>`, `fix/<issue>`, `docs/<doc>`; Conventional Commits (AGENTS §10). Small PRs (ideally < 500 changed lines excluding migrations and generated types). |
+| Branches & commits | `feature/<task-name>` (names in §4), `fix/<issue>`, `docs/<doc>`, `chore/<topic>`; branches are short-lived and deleted after merge; `main` is the only long-lived branch and the stable integration branch; Conventional Commits (AGENTS §10). Small PRs (ideally < 500 changed lines excluding migrations and generated types). |
 | Reviews | Every PR needs one approval. Suggested pairing: P1 ↔ P2, P3 ↔ P4, plus the owner of any app the PR touches. `core` changes need two approvals. |
 | **Contract changes** | Any change to an endpoint, error code, model field or constraint: (1) PR that updates `BACKEND_ARCHITECTURE.md` / `SPEC.md`, (2) regenerated `api-types.gen.ts`, (3) approval from every person consuming it. No silent contract drift. |
 | Migrations | Only the app owner creates migrations for their app. Rebase and re-run `makemigrations` before merging; never edit a merged migration. |
@@ -395,5 +390,4 @@ A task is done only when **all** of these hold (AGENTS §12, FEATURES §1):
 | D2 | Razorpay test-mode keys | **Recorded 2026-10-09:** provided before T14 is signed off. Not a blocker for T00/T01 or for building T14 with the fake gateway. |
 | L1–L5 | Legal and contact content (SECURITY §19.1) | `[PRE-LAUNCH REQUIREMENT]`, not on the implementation critical path |
 | — | Email provider credentials | **Recorded 2026-10-09:** provided before staging email-flow testing. Local development uses the console email backend. Not a blocker for T00/T01. |
-| **G1** | How to resolve the 4 conflicting frontend files in T00 (two independent discover/explore implementations) | **REQUIRES DECISION** (recommendation in the Phase 8 readiness note) |
-| **G2** | Whether the urgent fixes N1–N5, N7 go into T00 before T01 | **REQUIRES DECISION** (recommended: yes) |
+| **D19** | Implementation strategy | **DECIDED 2026-10-09:** fresh implementation from the approved design; legacy code retired and preserved in `legacy/*` tags (T00, §5). Supersedes G1 and G2 (no reconciliation of legacy code). |

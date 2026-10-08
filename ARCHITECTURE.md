@@ -412,6 +412,8 @@ The MVP target is tens of libraries and a few thousand students.
 
 ## 23. Migration strategy: old → final
 
+> **Updated by D19 (2026-10-09):** instead of restructuring the old code in place, the legacy application code is removed in T00 (preserved in `legacy/*` tags) and the final architecture is implemented fresh. §23.1 remains the checklist of legacy patterns that must not reappear; §23.2 is replaced by `IMPLEMENTATION_PLAN.md` §3–§5.
+
 ### 23.1 Old architecture (to be removed or replaced)
 
 | Item | Location | Action |

@@ -464,3 +464,7 @@ N1 and N2 are not exploitable in any live system (nothing is deployed), but `mai
 | Student booking, payment, membership and notification pages; two independent discover/explore implementations | UI_ARCHITECTURE routes and components | Rebuilt in T16/T18/T19/T25. Reuse logic where sound (Razorpay checkout handling, discovery filters). Only one implementation survives. |
 | `complaints-work` model (categories differ from SPEC §3.16; `resolution_note` vs `owner_response`) | SPEC §3.16 | Input to T21 |
 | `SeatMapSection.tsx` (unmerged branch) | `components/seat-map/SeatMap` | Input to T16 |
+
+### 28.5 Outcome
+
+On 2026-10-09 the project lead decided (**D19**) not to reconcile this code: the legacy application is retired, preserved in `legacy/*` tags, and the implementation restarts from the approved design (`IMPLEMENTATION_PLAN.md` T00 and §5). The "Planned handling" column in §28.4 is therefore superseded. Findings N1–N8 are recorded as patterns that must not reappear.

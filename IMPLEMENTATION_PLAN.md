@@ -150,6 +150,7 @@ The application code from before the approved design is **retired, not reconcile
 - **DoD:** `main` contains only the approved documents and the local-development setup; every legacy head is reachable through a `legacy/*` tag on GitHub; no history rewritten; no branch deleted without confirmation.
 
 #### T01 Backend foundation · P1 · L · `feature/platform-foundation`
+- **Sequencing notes (recorded during implementation, 2026-10-09):** (1) T01 also creates the `accounts.User` **model** from SPEC §3.1, because Django requires the custom user model to exist before the first migration; T04 still owns all account endpoints and services. (2) `AuditLog.library` (FK to Library) and the tenant mixins `OwnerLibraryScopedMixin` / `HasLibrary` need the Library model, so they are added in T08 (a `core` migration reviewed by P1). (3) DRF's 405/415/parse errors and the health check's 503 got envelope codes (`BACKEND_ARCHITECTURE.md` §6.1). (4) The throttling cache table is created by a `core` migration, so no manual `createcachetable` step is needed.
 - **Backend files:** `config/settings/{base,local,test,production}.py`, `config/urls.py` (only `/api/v1/`), `requirements.txt`, `requirements-dev.txt`, `backend/.env.example`; `apps/core/`: `models.py` (Domain, Amenity, AuditLog), `exceptions.py`, `handlers.py`, `responses.py`, `pagination.py`, `permissions.py`, `mixins.py`, `middleware.py` (request ID, access log), `logging.py` (JSON + redaction), `audit.py`, `storage.py`, `images.py`, `dates.py`, `views.py` (#1 health, #2–#3 meta, #5 schema).
 - **DB:** new tables `core_domain`, `core_amenity` (+ data migration seeding the vocabularies from SPEC §3.3), `core_auditlog`.
 - **APIs:** #1, #2, #3, #5.
@@ -199,6 +200,7 @@ The application code from before the approved design is **retired, not reconcile
 ### Stage 2 — Library and seats
 
 #### T08 Libraries and pricing plans · P2 · M · `feature/library-management`
+- **Also (from T01 sequencing):** add `AuditLog.library` (FK PROTECT, index `(library, -created_at)`) via a `core` migration, extend `core.audit.record()` with `library=`, and add `OwnerLibraryScopedMixin`, `StudentOwnedScopedMixin` and `HasLibrary` to `core` with their tests. P1 reviews the `core` changes.
 - **Backend:** `apps/libraries/` `models.py` (Library and PricingPlan changes, SPEC §3.5, §3.7), `services.py` (`create_library`, `update_library`, plan CRUD, `refresh_publish_state`), `selectors.py` (public list with bounding box, detail, `starting_price`, seat counts via `seats.selectors`), serializers (owner vs public output), views, urls.
 - **DB:** add description, city, area, decimal coordinates (0,0 → NULL), M2M domains (data-migrate `domains_catered`) and amenities, `is_published`, `published_at`, `is_active`, `operating_notes` rename, drop `total_seats`, owner FK to PROTECT; plan `timing_note`, `is_active`, checks, partial unique name.
 - **APIs:** #14, #15 (without `domain_breakdown` until T23 adds it; **the field is omitted, not faked**), #17–#24.

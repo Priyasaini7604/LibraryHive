@@ -165,6 +165,7 @@ The application code from before the approved design is **retired, not reconcile
 - **DoD:** a PR with a failing test cannot be merged.
 
 #### T03 Frontend foundation · P1 · L · `feature/frontend-foundation`
+- **Implementation notes (2026-10-09):** see `UI_ARCHITECTURE.md` §17 (Tailwind 4 CSS tokens, unified `radix-ui`, TypeScript 5.9 / ESLint 9 for tool compatibility, `BACKEND_ORIGIN` and `MEDIA_ORIGIN` env vars, CSP nonce via `proxy.ts`). The full login/refresh round trip is verified end to end in T04, once the auth endpoints exist.
 - **Frontend files:** `package.json` (dependencies in UI §15), `tailwind.config.ts`, `postcss.config`, `app/globals.css` (tokens), `app/layout.tsx` (font, providers), `app/global-error.tsx`, `app/not-found.tsx`, `next.config.mjs` (**rewrite `/api/v1/auth/*` to the backend for SEC-1**, security headers and CSP from SECURITY §8), `tsconfig.json` (`strict: true`), ESLint config, Vitest config; `components/ui/*` (full kit, UI §2.3), `components/layout/*` (PublicShell, StudentShell, OwnerShell, AuthGuard); `lib/api-client.ts`, `lib/auth.ts`, `lib/auth-context.tsx` (in-memory access token, refresh on load), `lib/query-keys.ts`, `lib/errors.ts`, `lib/format.ts`, `lib/types.ts`, `lib/api-types.gen.ts` + generation script; `frontend/.env.example`.
 - **Must not reappear (legacy patterns):** inline-styled header in `layout.tsx`, `declarations.d.ts`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`, `/api` base URL.
 - **Dependencies:** T00 (T04's auth endpoints for the full refresh flow; until then the AuthProvider is tested with unit tests only).

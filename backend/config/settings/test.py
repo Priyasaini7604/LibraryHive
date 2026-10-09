@@ -20,6 +20,9 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
+# No artificial delay in tests (a dedicated test checks the padding).
+PASSWORD_RESET_MIN_RESPONSE_SECONDS = 0
+
 # Keep test output readable; tests that check log lines use assertLogs.
 LOGGING = copy.deepcopy(LOGGING)
 LOGGING["root"]["level"] = "CRITICAL"

@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.core.responses import created, error_response, ok
 
-from . import services, tokens
+from . import password_reset, services, tokens
 from .cookies import (
     FrontendOriginRequired,
     JsonRequestRequired,
@@ -22,11 +22,14 @@ from .serializers import (
     AccessTokenOutput,
     AuthOutput,
     LoginInput,
+    MessageOutput,
+    PasswordResetConfirmInput,
+    PasswordResetRequestInput,
     ProfileUpdateInput,
     RegisterInput,
     UserSerializer,
 )
-from .throttles import LoginEmailThrottle
+from .throttles import LoginEmailThrottle, PasswordResetEmailThrottle
 
 security_logger = logging.getLogger("apps.security")
 
@@ -132,3 +135,35 @@ class MeView(APIView):
             domain_provided="domain_code" in values,
         )
         return ok(UserSerializer(user).data)
+
+
+class PasswordResetRequestView(APIView):
+    """#13a: email a reset code. The response is identical for every email."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+    throttle_classes = [ScopedRateThrottle, PasswordResetEmailThrottle]
+    throttle_scope = "password_reset"
+
+    @extend_schema(request=PasswordResetRequestInput, responses={200: MessageOutput})
+    def post(self, request):
+        data = PasswordResetRequestInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        return ok({"message": password_reset.request_password_reset(email=data.validated_data["email"])})
+
+
+class PasswordResetConfirmView(APIView):
+    """#13b: set a new password with the emailed code. Issues no tokens."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
+
+    @extend_schema(request=PasswordResetConfirmInput, responses={200: MessageOutput})
+    def post(self, request):
+        data = PasswordResetConfirmInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        return ok({"message": password_reset.confirm_password_reset(**data.validated_data)})

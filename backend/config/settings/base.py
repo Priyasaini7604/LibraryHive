@@ -197,6 +197,7 @@ REST_FRAMEWORK = {
         "claim_start": "10/hour",
         "claim_complete": "10/min",
         "password_reset": "10/hour",
+        "password_reset_email": "3/10min",
         "hold_create": "10/min",
         "upload": "30/hour",
         "webhook": "120/min",
@@ -288,6 +289,7 @@ MAX_LIBRARY_PHOTOS = config("MAX_LIBRARY_PHOTOS", default=15, cast=int)
 MAX_UPLOAD_BYTES = config("MAX_UPLOAD_BYTES", default=5 * 1024 * 1024, cast=int)
 MAX_IMAGE_PIXELS = 40_000_000
 CLAIM_OTP_MINUTES = config("CLAIM_OTP_MINUTES", default=10, cast=int)
+PASSWORD_RESET_MIN_RESPONSE_SECONDS = config("PASSWORD_RESET_MIN_RESPONSE_SECONDS", default=0.4, cast=float)
 PASSWORD_RESET_MINUTES = config("PASSWORD_RESET_MINUTES", default=30, cast=int)
 CLAIM_CODE_DAYS = config("CLAIM_CODE_DAYS", default=7, cast=int)
 CLAIM_MAX_ATTEMPTS = config("CLAIM_MAX_ATTEMPTS", default=5, cast=int)

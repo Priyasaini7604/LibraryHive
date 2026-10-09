@@ -53,3 +53,17 @@ class AccessTokenOutput(serializers.Serializer):
 class AuthOutput(serializers.Serializer):
     access = serializers.CharField()
     user = UserSerializer()
+
+
+class PasswordResetRequestInput(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+
+
+class PasswordResetConfirmInput(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    code = serializers.RegexField(r"^\d{6}$", error_messages={"invalid": "Enter the 6-digit code from your email."})
+    new_password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+
+
+class MessageOutput(serializers.Serializer):
+    message = serializers.CharField()

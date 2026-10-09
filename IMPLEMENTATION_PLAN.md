@@ -176,6 +176,7 @@ The application code from before the approved design is **retired, not reconcile
 ### Stage 1 — Identity
 
 #### T04 Accounts and authentication · P1 · M · `feature/auth`
+- **Implementation notes (2026-10-09):** cookie endpoints (#6–#9) require both the frontend `Origin` (`ORIGIN_NOT_ALLOWED`, 403) and a JSON request (`UNSUPPORTED_MEDIA_TYPE`, 415). `CLAIM_REQUIRED` details are `{"channels": ["email_otp"?, "owner_code"], "masked_email"?: "r***@gmail.com"}`; an owner signing up with an offline student's phone or email gets `PHONE_TAKEN`/`EMAIL_TAKEN` (owners cannot claim). `has_library` is always false until T08 adds the Library model. Verified end to end through the Next.js auth proxy (register, me, refresh from cookie, logout, refresh rejected after logout, foreign origin rejected). First generated API types committed in `frontend/lib/api-types.gen.ts`.
 - **Backend:** `apps/accounts/` `models.py` (User changes, SPEC §3.1), `phone.py` (`normalize_phone`), `services.py` (`register`, `login`, `logout`, `update_profile`, `find_identity`), `selectors.py`, `serializers.py`, `views.py`, `urls.py`, `admin.py`.
 - **DB:** migration: `updated_at`, `is_offline`, `claimed_at`, `domain` FK (data-migrate the free-text domain), phone E.164 + unique, email nullable + checks; `token_blacklist` tables.
 - **APIs:** #6–#11 with the refresh cookie (SEC-1), `CLAIM_REQUIRED` and `IDENTITY_CONFLICT` behaviour.

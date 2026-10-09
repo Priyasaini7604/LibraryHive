@@ -88,3 +88,4 @@ Secrets (`.env`, `backend/.env`, `frontend/.env.local`) are git-ignored and must
 - One short-lived branch per task: `feature/<task-name>` (see `IMPLEMENTATION_PLAN.md` §4), `fix/<issue>`, `docs/<doc>`, `chore/<topic>`.
 - Commits follow Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - Branches are deleted after merge. History on shared branches is never rewritten.
+- CI (`.github/workflows/ci.yml`) runs on every pull request and on `main`: backend lint, formatting, migration checks, production-settings check and tests on PostgreSQL (coverage ≥ 85%); frontend lint, type check, tests and build; dependency audits. A PR is merged only when CI is green and it has one approving review.

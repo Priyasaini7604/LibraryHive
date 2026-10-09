@@ -184,6 +184,7 @@ The application code from before the approved design is **retired, not reconcile
 - **DoD:** all auth security tests in SECURITY §20 "Auth" pass.
 
 #### T05 Password reset · P1 · S · `feature/password-reset`
+- **Implementation notes (2026-10-09):** `AccountClaim` is created in T05 without the `library` column; T08 adds it with a migration (owner codes are issued per library). The 6-digit code is hashed with Django's password hasher, valid `PASSWORD_RESET_MINUTES` (30), single use, 5 attempts. Requests are padded to `PASSWORD_RESET_MIN_RESPONSE_SECONDS` (0.4 s; 0 in tests) so response time does not reveal whether an account exists. The code is consumed only when the new password passes validation, and the claim verified is the claim consumed (safe against a concurrent new request). Email delivery failures are logged and never change the API response. Frontend: typed `requestPasswordReset` / `confirmPasswordReset` client functions and regenerated API types; the screens are T07. Known limit (by design, SECURITY §4.1): access tokens already issued stay valid until they expire (60 min); only refresh tokens are revoked.
 - **Backend:** `AccountClaim` model (all three channels), `services.request_password_reset` / `confirm_password_reset`, email templates; APIs **#13a, #13b**.
 - **Tests:** SECURITY §20 one-time-code tests; neutral responses; all refresh tokens blacklisted after reset; offline records get no email.
 - **Dependencies:** T04.

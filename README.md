@@ -76,9 +76,16 @@ python manage.py test                 # uses config.settings.test and a temporar
 
 `manage.py` uses `config.settings.local` by default and `config.settings.test` for `manage.py test`; deployed processes use `config.settings.production`, which refuses to start with unsafe values.
 
-### 3. Frontend
+### 3. Frontend (Next.js, Node.js 20.9+)
 
-Set up in task T03 (frontend foundation).
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local            # NEXT_PUBLIC_API_URL, BACKEND_ORIGIN, MEDIA_ORIGIN
+npm run dev                           # http://localhost:3000
+```
+
+Checks: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. Details in [frontend/README.md](frontend/README.md).
 
 Secrets (`.env`, `backend/.env`, `frontend/.env.local`) are git-ignored and must never be committed.
 

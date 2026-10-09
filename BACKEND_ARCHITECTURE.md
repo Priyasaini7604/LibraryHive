@@ -168,7 +168,7 @@ Query parameters: `?page=1&page_size=20` (max 100). Response `data`:
 
 | Scope | Rate |
 |---|---|
-| `login` | 10/min per IP, 20/hour per email |
+| `login` | 10/min per IP; plus scope `login_email` 20/hour per email (T04) |
 | `register` | 5/min per IP |
 | `claim_start` | 3 per 10 min per identity, 10/hour per IP |
 | `claim_complete` | 10 per 10 min per IP (plus per-claim attempt limit 5) |
@@ -275,6 +275,7 @@ class GatewayError(AppError):       status = 502; code = "GATEWAY_ERROR"
 | UNSUPPORTED_MEDIA_TYPE | 415 | Request content type not accepted (added in T01) |
 | PARSE_ERROR | 400 | Malformed request body (added in T01) |
 | SERVICE_UNAVAILABLE | 503 | Health check: database unreachable (added in T01) |
+| ORIGIN_NOT_ALLOWED | 403 | Cookie endpoint called without the frontend `Origin` (SECURITY §4.3; added in T04) |
 
 ---
 
@@ -599,7 +600,7 @@ Django email backend: `console` locally, the provider's SMTP or API backend in p
 
 **Environment variables** (complete list goes into `backend/.env.example`):
 
-`DJANGO_SETTINGS_MODULE`, `ENVIRONMENT` (`local`/`staging`/`production`), `APP_VERSION`, `SECRET_KEY`, `JWT_SIGNING_KEY` (separate JWT key, SECURITY §4.1), `ADMIN_URL`, `NUM_PROXIES` (trusted proxies for client IPs), `AWS_PRIVATE_BUCKET_NAME` (private media, SECURITY §9), `DEBUG`, `ALLOWED_HOSTS`, `DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STORAGE_BACKEND`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `MEDIA_PUBLIC_BASE_URL`, `EMAIL_BACKEND`, `EMAIL_HOST`/`EMAIL_PORT`/`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` (or the provider API key), `DEFAULT_FROM_EMAIL`, `EMAIL_NOTIFICATIONS_ENABLED`, `JOB_TRIGGER_TOKEN`, `LOG_LEVEL`, `SEAT_HOLD_MINUTES`, `MEMBERSHIP_DUE_WINDOW_DAYS`, `RENEWAL_RESTART_AFTER_OVERDUE_DAYS`, `MAX_LIBRARY_PHOTOS`, `MAX_UPLOAD_BYTES`, `CLAIM_OTP_MINUTES`, `PASSWORD_RESET_MINUTES`, `CLAIM_CODE_DAYS`, `CLAIM_MAX_ATTEMPTS`.
+`DJANGO_SETTINGS_MODULE`, `ENVIRONMENT` (`local`/`staging`/`production`), `APP_VERSION`, `SECRET_KEY`, `JWT_SIGNING_KEY` (separate JWT key, SECURITY §4.1), `ADMIN_URL`, `REFRESH_COOKIE_SECURE` (default true; browsers accept Secure cookies on http://localhost), `NUM_PROXIES` (trusted proxies for client IPs), `AWS_PRIVATE_BUCKET_NAME` (private media, SECURITY §9), `DEBUG`, `ALLOWED_HOSTS`, `DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STORAGE_BACKEND`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `MEDIA_PUBLIC_BASE_URL`, `EMAIL_BACKEND`, `EMAIL_HOST`/`EMAIL_PORT`/`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` (or the provider API key), `DEFAULT_FROM_EMAIL`, `EMAIL_NOTIFICATIONS_ENABLED`, `JOB_TRIGGER_TOKEN`, `LOG_LEVEL`, `SEAT_HOLD_MINUTES`, `MEMBERSHIP_DUE_WINDOW_DAYS`, `RENEWAL_RESTART_AFTER_OVERDUE_DAYS`, `MAX_LIBRARY_PHOTOS`, `MAX_UPLOAD_BYTES`, `CLAIM_OTP_MINUTES`, `PASSWORD_RESET_MINUTES`, `CLAIM_CODE_DAYS`, `CLAIM_MAX_ATTEMPTS`.
 
 `DATABASE_URL` replaces the separate `DB_*` variables in `AGENTS.md` §11 and is parsed by `dj-database-url`.
 

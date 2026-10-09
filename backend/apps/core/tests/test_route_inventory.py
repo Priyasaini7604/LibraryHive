@@ -15,6 +15,10 @@ PUBLIC_ENDPOINTS = {
     "meta-domains",
     "meta-amenities",
     "schema",  # public only when settings.SCHEMA_PUBLIC (non-production); see test_platform_views
+    # Auth endpoints (SECURITY.md section 5); cookie endpoints also require the frontend Origin.
+    "auth-register",
+    "auth-login",
+    "auth-refresh",
 }
 
 

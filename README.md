@@ -52,13 +52,33 @@ If port 5432 is already in use, set `POSTGRES_PORT` in `.env` (and use the same 
 
 The Django test runner creates a separate `test_<name>` database in the same container automatically.
 
-### 2. Backend and 3. Frontend
+### 2. Backend (Django, Python 3.12+)
 
-Set up in tasks T01 (backend foundation) and T03 (frontend foundation). The backend reads `DATABASE_URL` from `backend/.env`, for example:
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate      macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env                  # then set SECRET_KEY, JWT_SIGNING_KEY and the DATABASE_URL password
+python manage.py migrate              # creates tables, seeds vocabularies, creates the cache table
+python manage.py runserver            # http://127.0.0.1:8000/api/v1/health/
+```
 
+Generate local keys with `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+
+Quality checks (the same ones CI runs):
+
+```bash
+ruff check . && ruff format --check .
+python manage.py makemigrations --check --dry-run
+python manage.py test                 # uses config.settings.test and a temporary test database
 ```
-DATABASE_URL=postgres://libraryhive:<your password>@127.0.0.1:5432/libraryhive
-```
+
+`manage.py` uses `config.settings.local` by default and `config.settings.test` for `manage.py test`; deployed processes use `config.settings.production`, which refuses to start with unsafe values.
+
+### 3. Frontend
+
+Set up in task T03 (frontend foundation).
 
 Secrets (`.env`, `backend/.env`, `frontend/.env.local`) are git-ignored and must never be committed.
 

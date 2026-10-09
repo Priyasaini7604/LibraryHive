@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "RUF"]
+ignore = [
+    "RUF012",  # Django/DRF class attributes (Meta.fields, permission_classes) are mutable by convention
+]
+
+[tool.ruff.lint.per-file-ignores]
+"config/settings/*.py" = ["F403", "F405"]  # settings modules extend base with star imports
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.coverage.run]
+source = ["apps"]
+omit = ["*/migrations/*", "*/tests/*"]

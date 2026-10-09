@@ -76,6 +76,7 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   UNSUPPORTED_MEDIA_TYPE: "This request couldn't be processed.",
   PARSE_ERROR: "This request couldn't be processed.",
   SERVICE_UNAVAILABLE: "The service is temporarily unavailable. Please try again shortly.",
+  ORIGIN_NOT_ALLOWED: "This request was blocked for your security. Please reload the page and try again.",
   SERVER_ERROR: "Something went wrong on our side.",
 };
 

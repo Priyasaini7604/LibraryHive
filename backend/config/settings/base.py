@@ -192,6 +192,7 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "300/min",
         "login": "10/min",
+        "login_email": "20/hour",
         "register": "5/min",
         "claim_start": "10/hour",
         "claim_complete": "10/min",
@@ -218,6 +219,8 @@ SIMPLE_JWT = {
 }
 REFRESH_COOKIE_NAME = "lh_refresh"
 REFRESH_COOKIE_PATH = "/api/v1/auth/"
+# Browsers accept Secure cookies on http://localhost, so this stays True in development too.
+REFRESH_COOKIE_SECURE = config("REFRESH_COOKIE_SECURE", default=True, cast=bool)
 
 # --- OpenAPI schema (BACKEND_ARCHITECTURE.md #5) -------------------------------
 # Public only in local/test; staff-only in production (SECURITY.md section 15).

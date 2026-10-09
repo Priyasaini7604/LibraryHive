@@ -621,3 +621,24 @@ Every UI-facing P0/P1 feature in `FEATURES.md` has a screen above. Features with
 | U9 | Public library pages and SEO | Client-rendered in the MVP (ARCHITECTURE §7); server-rendered metadata and social previews are P2 |
 
 **Contract amendment made in this phase:** BACKEND_ARCHITECTURE #44 gains an optional `order_id` query parameter (used by checkout to confirm a payment after a dropped connection). Forgot-password endpoints 13a and 13b were added at your request.
+
+---
+
+## 17. Implementation notes (T03, 2026-10-09)
+
+Choices made while building the frontend foundation. None changes a screen, route or behaviour above.
+
+| Topic | Planned | Implemented | Why |
+|---|---|---|---|
+| Tailwind | `tailwind.config.ts` | Tailwind CSS 4, CSS-first tokens in `app/globals.css` (`@theme`) | Tailwind 4's standard setup; same tokens |
+| Radix | individual `@radix-ui/react-*` packages | the unified `radix-ui` package | Same primitives, one dependency |
+| TypeScript | 5.x/latest | 5.9 | `typescript-eslint` and `openapi-typescript` do not support TypeScript 6/7 yet |
+| ESLint | — | 9.x flat config (`eslint-config-next` core-web-vitals + typescript, `jsx-a11y` recommended, `no-explicit-any`, no direct `fetch()` outside `lib/api-client.ts`) | `eslint-plugin-react` supports ESLint up to 9 |
+| Environment | `NEXT_PUBLIC_API_URL` | plus server-only `BACKEND_ORIGIN` (target of the `/api/v1/auth/*` rewrite, SEC-1) and `MEDIA_ORIGIN` (CSP `img-src`) | Needed by the auth proxy and the CSP |
+| Auth rewrite | — | destination keeps Django's trailing slash (`/:path*/`); verified against a running server | The rewrite matcher drops the slash, which would break every auth call |
+| CSP | headers | `proxy.ts` (Next.js 16's name for middleware) adds a per-request nonce; the root layout calls `connection()` so pages render per request and receive it | Nonces need per-request rendering |
+| UI kit files | one file per component | grouped by concern: `button`, `input` (Input, Textarea, PhoneField, OtpField, DateField), `form-field`, `choice` (Select, Checkbox, RadioCardGroup), `surface` (Card, Badge, StatusBadge, Alert, Avatar, ProgressBar), `states` (Skeleton, EmptyState, ErrorState, FullPageSkeleton), `overlay` (Dialog, Sheet, ConfirmDialog, DropdownMenu, Tooltip), `navigation` (Tabs, Pagination, Stepper, Breadcrumbs), `data-table` (DataTable, FilterBar), `toaster` | Fewer tiny files; same components |
+| Dialog focus | Radix default | dialogs and sheets return focus to whatever opened them, even when opened from a menu (not only from `Dialog.Trigger`) | Found by a test; required by section 11 |
+| Dependencies added later | — | `leaflet`/`react-leaflet` with T16, Playwright with T07 | Installed by the first task that uses them |
+| Generated API types | `lib/api-types.gen.ts` | `npm run api:types`; first generated once T01 and T04 are merged | The schema comes from the backend |
+| Tests | Vitest | Vitest with the `threads` pool | The default `forks` pool timed out on Windows paths containing spaces |

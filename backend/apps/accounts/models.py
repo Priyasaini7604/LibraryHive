@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.core.validators import RegexValidator
@@ -102,3 +103,62 @@ class User(BaseModel, AbstractBaseUser, PermissionsMixin):
         self.email = normalize_email_address(self.email)
         self.name = (self.name or "").strip()
         super().save(*args, **kwargs)
+
+
+class AccountClaim(BaseModel):
+    """Short-lived one-time code that proves ownership (SPEC.md 3.2).
+
+    Channels: `password_reset` (T05, AUTH-15) and, in T06, `email_otp` and
+    `owner_code` for claiming an offline account (OFF-04). The plain code is
+    never stored; only a hash made with Django's password hasher.
+
+    The `library` column (owner codes are issued by an owner for their
+    library) is added together with the Library model in T08.
+    """
+
+    class Channel(models.TextChoices):
+        EMAIL_OTP = "email_otp", "Email code"
+        OWNER_CODE = "owner_code", "Owner code"
+        PASSWORD_RESET = "password_reset", "Password reset"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        USED = "used", "Used"
+        EXPIRED = "expired", "Expired"
+        REVOKED = "revoked", "Revoked"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="claims")
+    channel = models.CharField(max_length=16, choices=Channel.choices)
+    code_hash = models.CharField(max_length=128)
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "status"], name="accountclaim_user_status_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "channel"],
+                condition=Q(status="pending"),
+                name="accountclaim_one_pending",
+            ),
+            models.CheckConstraint(
+                condition=Q(channel__in=["email_otp", "owner_code", "password_reset"]),
+                name="accountclaim_channel_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["pending", "used", "expired", "revoked"]),
+                name="accountclaim_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=~Q(channel="owner_code") | Q(issued_by__isnull=False),
+                name="accountclaim_owner_code_has_issuer",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.channel} for {self.user_id} ({self.status})"

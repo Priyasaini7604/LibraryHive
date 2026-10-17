@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from .models import User
+from .models import AccountClaim, User
 
 
 @admin.register(User)
@@ -23,3 +23,30 @@ class UserAdmin(DjangoUserAdmin):
     add_fieldsets = (
         (None, {"classes": ("wide",), "fields": ("email", "name", "phone", "role", "password1", "password2")}),
     )
+
+
+@admin.register(AccountClaim)
+class AccountClaimAdmin(admin.ModelAdmin):
+    """Read-only support view. The code hash is never shown and codes cannot be edited."""
+
+    list_display = ("user", "channel", "status", "attempts", "expires_at", "created_at")
+    list_filter = ("channel", "status")
+    search_fields = ("user__email",)
+    exclude = ("code_hash",)
+    readonly_fields = (
+        "user",
+        "channel",
+        "issued_by",
+        "status",
+        "expires_at",
+        "attempts",
+        "used_at",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

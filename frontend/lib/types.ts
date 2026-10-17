@@ -52,3 +52,8 @@ export interface AccessTokenResponse {
 export interface LoginResponse extends AccessTokenResponse {
   user: User;
 }
+
+/** Response of the password-reset endpoints (#13a, #13b): a neutral message only, never tokens. */
+export interface MessageResponse {
+  message: string;
+}

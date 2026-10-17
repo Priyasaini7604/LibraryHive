@@ -67,3 +67,22 @@ class PasswordResetConfirmInput(serializers.Serializer):
 
 class MessageOutput(serializers.Serializer):
     message = serializers.CharField()
+
+
+class ClaimStartInput(serializers.Serializer):
+    phone = serializers.CharField(max_length=32)
+    email = serializers.EmailField(max_length=254, required=False, allow_blank=True)
+    channel = serializers.ChoiceField(choices=[("email_otp", "Email code"), ("owner_code", "Owner code")])
+
+
+class ClaimStartOutput(serializers.Serializer):
+    channel = serializers.CharField()
+    masked_email = serializers.CharField(allow_null=True)
+
+
+class ClaimCompleteInput(serializers.Serializer):
+    phone = serializers.CharField(max_length=32)
+    code = serializers.CharField(max_length=16, trim_whitespace=False)
+    password = serializers.CharField(max_length=128, write_only=True, trim_whitespace=False)
+    email = serializers.EmailField(max_length=254, required=False, allow_blank=True)
+    name = serializers.CharField(min_length=2, max_length=150, required=False, allow_blank=True)

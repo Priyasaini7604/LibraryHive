@@ -195,6 +195,7 @@ REST_FRAMEWORK = {
         "login_email": "20/hour",
         "register": "5/min",
         "claim_start": "10/hour",
+        "claim_start_identity": "3/10min",
         "claim_complete": "10/min",
         "password_reset": "10/hour",
         "password_reset_email": "3/10min",

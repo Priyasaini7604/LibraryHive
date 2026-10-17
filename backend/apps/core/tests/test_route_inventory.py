@@ -19,6 +19,8 @@ PUBLIC_ENDPOINTS = {
     "auth-register",
     "auth-login",
     "auth-refresh",
+    "auth-claim-start",
+    "auth-claim-complete",
     "auth-password-reset-request",
     "auth-password-reset-confirm",
 }

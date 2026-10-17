@@ -170,8 +170,8 @@ Query parameters: `?page=1&page_size=20` (max 100). Response `data`:
 |---|---|
 | `login` | 10/min per IP; plus scope `login_email` 20/hour per email (T04) |
 | `register` | 5/min per IP |
-| `claim_start` | 3 per 10 min per identity, 10/hour per IP |
-| `claim_complete` | 10 per 10 min per IP (plus per-claim attempt limit 5) |
+| `claim_start` | scope `claim_start`: 10/hour per IP; plus scope `claim_start_identity`: 3 per 10 min per submitted phone, whether or not a record exists (T06) |
+| `claim_complete` | 10/min per IP (plus per-claim attempt limit 5 and a per-phone limit of 5 wrong attempts counted in the cache, even for phones without a record) (T06) |
 | `password_reset` | scope `password_reset`: 10/hour per IP, shared by request and confirm; plus scope `password_reset_email`: 3 per 10 min per email on the request endpoint only (keyed on the submitted email whether or not an account exists). Wrong-code attempts are limited per code (5) and per email (5, counted in the cache even for emails without an account), so a 429 reveals nothing (T05). |
 | `hold_create` | 10/min per user |
 | `upload` | 30/hour per user |

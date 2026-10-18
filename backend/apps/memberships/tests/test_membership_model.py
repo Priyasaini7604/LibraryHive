@@ -17,7 +17,7 @@ from apps.memberships import selectors
 from apps.memberships.models import Membership
 from apps.seats.models import Seat
 
-TODAY = date(2026, 10, 18)
+TODAY = business_today()  # the real business date, so fixtures never drift from the code under test
 _seat_numbers = count(1)
 
 
@@ -91,7 +91,8 @@ class DerivedStatusTests(TestCase):
 
     def test_today_is_the_kolkata_date_not_the_utc_date(self):
         # 20:30 UTC on 18 Oct is 02:00 IST on 19 Oct: a membership due on the 18th is already overdue.
-        membership = self.membership(0, start_date=TODAY - timedelta(days=60))
+        due = date(2026, 10, 18)  # a fixed date: the instant below is fixed too
+        membership = self.membership((due - TODAY).days, start_date=due - timedelta(days=60))
         instant = datetime(2026, 10, 18, 20, 30, tzinfo=UTC)
         with mock.patch("django.utils.timezone.now", return_value=instant):
             default_today = selectors.annotate_status(Membership.objects.filter(pk=membership.pk)).get().status

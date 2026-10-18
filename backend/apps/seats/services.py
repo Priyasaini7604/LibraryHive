@@ -435,3 +435,45 @@ def disable_seat(*, library: Library, seat: Seat, actor, reason: str) -> Seat:
         reason=seat.disabled_reason,
     )
     return seat
+
+
+def lock_seat(seat_id, *, library: Library) -> Seat:
+    """Lock one active seat of the library for a writer in another app (the Seat step of SPEC.md 4.1).
+
+    Unknown, inactive or foreign seats are a 404. Call inside `transaction.atomic()`.
+    """
+    return _locked_seat_by_id(seat_id, library=library)
+
+
+def claim_seat_for_admission(seat: Seat, *, actor, now=None) -> None:
+    """Check that a *locked* seat can be given to a walk-in student, consuming the owner's manual hold (OFF-02).
+
+    Free means: not disabled, no active membership, no live student hold. A live manual hold of this library
+    is the owner's own reservation, so it is completed (consumed) instead of blocking. Raises 409
+    `SEAT_UNAVAILABLE` otherwise.
+    """
+    now = now or timezone.now()
+    expire_dead_holds_for_seat(seat, now=now)
+    if seat.is_disabled or _memberships().active_membership_exists(seat):
+        raise _conflict("This seat is not free.", "SEAT_UNAVAILABLE", seat_id=str(seat.pk), actor_id=str(actor.pk))
+    live = list(SeatHold.objects.live(now).filter(seat=seat).select_for_update())
+    if any(hold.kind != SeatHold.Kind.OWNER_MANUAL for hold in live):
+        raise _conflict("This seat is not free.", "SEAT_UNAVAILABLE", seat_id=str(seat.pk), actor_id=str(actor.pk))
+    for hold in live:
+        hold.status = SeatHold.Status.COMPLETED
+        hold.closed_at = now
+        hold.save(update_fields=["status", "closed_at", "updated_at"])
+        audit.record(
+            actor=actor,
+            action="hold.consume",
+            entity_type="seat_hold",
+            entity_id=hold.pk,
+            library=seat.library,
+            changes={"seat": seat.label},
+            reason="Consumed by an offline admission",
+        )
+
+
+def lock_seat_by_pk(seat_pk) -> Seat:
+    """Lock a seat by id even if it is now inactive (archival must free a seat that was deactivated later)."""
+    return Seat.objects.select_for_update().get(pk=seat_pk)

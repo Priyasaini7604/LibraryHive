@@ -116,3 +116,23 @@ def owner_seat_map(library, *, include_inactive: bool = False, seat_ids=None) ->
         seat.occupant = occupants.get(seat.pk)
         seat.live_hold = holds.get(seat.pk)
     return seats
+
+
+def seat_counts_by_row(library) -> list[dict]:
+    """Per row of the layout: {row_label, total, occupied, reserved, empty}; disabled seats count only in `total`."""
+    rows: dict[str, dict] = {}
+    queryset = (
+        Seat.objects.filter(library=library, is_active=True)
+        .annotate(status=_status_expression())
+        .values("row_label", "status")
+        .annotate(n=Count("id"))
+        .order_by("row_label")
+    )
+    for item in queryset:
+        row = rows.setdefault(
+            item["row_label"], {"row_label": item["row_label"], "total": 0, "occupied": 0, "reserved": 0, "empty": 0}
+        )
+        row["total"] += item["n"]
+        if item["status"] != DISABLED:
+            row[item["status"]] += item["n"]
+    return list(rows.values())

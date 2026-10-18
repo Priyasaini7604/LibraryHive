@@ -37,7 +37,13 @@ class CreateOrderView(APIView):
     def post(self, request):
         data = CreateOrderInput(data=request.data)
         data.is_valid(raise_exception=True)
-        result = services.create_order(student=request.user, hold_id=data.validated_data["hold_id"])
+        values = data.validated_data
+        if values.get("membership_id"):
+            result = services.create_renewal_order(
+                student=request.user, membership_id=values["membership_id"], plan_id=values["plan_id"]
+            )
+        else:
+            result = services.create_order(student=request.user, hold_id=values["hold_id"])
         payment = result.payment
         user = request.user
         return created(

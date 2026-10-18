@@ -39,3 +39,10 @@ def mask_email(email: str | None) -> str | None:
         return None
     local, domain = email.split("@", 1)
     return f"{local[:1]}***@{domain}"
+
+
+def mask_phone(phone: str | None) -> str | None:
+    """'+919876543210' -> '+91*****3210' (shown to confirm identity, never in full)."""
+    if not phone or len(phone) < 7:
+        return None
+    return f"{phone[:3]}{'*' * (len(phone) - 7)}{phone[-4:]}"

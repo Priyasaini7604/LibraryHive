@@ -6,9 +6,26 @@ from .models import Payment
 
 
 class CreateOrderInput(serializers.Serializer):
-    """#41 (new booking): only the hold. The amount is never accepted from the client."""
+    """#41: either `hold_id` (new booking) or `membership_id` with an optional `plan_id` (renewal).
 
-    hold_id = serializers.UUIDField()
+    The amount is never accepted from the client. `plan_id` means something only for a renewal.
+    """
+
+    hold_id = serializers.UUIDField(required=False)
+    membership_id = serializers.UUIDField(required=False)
+    plan_id = serializers.CharField(max_length=64, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if bool(attrs.get("hold_id")) == bool(attrs.get("membership_id")):
+            raise serializers.ValidationError("Send either hold_id or membership_id.")
+        if attrs.get("membership_id") and attrs.get("plan_id"):
+            try:
+                attrs["plan_id"] = serializers.UUIDField().to_internal_value(attrs["plan_id"])
+            except serializers.ValidationError:
+                raise serializers.ValidationError({"plan_id": ["Enter a valid plan."]}) from None
+        else:
+            attrs["plan_id"] = None
+        return attrs
 
 
 class VerifyInput(serializers.Serializer):

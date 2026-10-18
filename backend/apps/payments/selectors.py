@@ -5,6 +5,8 @@ from datetime import date
 from django.db.models import Q, QuerySet
 from django.db.models.functions import Coalesce
 
+from apps.core.search import phone_digits
+
 from .models import Payment
 
 
@@ -50,7 +52,7 @@ def owner_payments(
     if date_to:
         queryset = queryset.filter(event_at__date__lte=date_to)
     if search:
-        digits = "".join(ch for ch in search if ch.isdigit())
+        digits = phone_digits(search)
         match = Q(student__name__icontains=search)
         if digits:
             match |= Q(student__phone__contains=digits)
@@ -64,3 +66,61 @@ def owner_payment(library, payment_id) -> Payment | None:
         .select_related("student", "recorded_by", "library", "plan", "membership__seat", "hold__seat")
         .first()
     )
+
+
+def membership_payments(membership) -> QuerySet[Payment]:
+    """The membership's successful payments, newest period first: its period history (SPEC.md 4.4)."""
+    return (
+        Payment.objects.filter(membership=membership, status=Payment.Status.SUCCESS)
+        .select_related("plan")
+        .order_by("-period_start", "-created_at")
+    )
+
+
+def revenue_between(library, start: date, end: date) -> dict:
+    """Successful payments paid between two business dates, inclusive (#84). Only `success` counts as revenue."""
+    from django.db.models import Count, Sum
+    from django.db.models.functions import TruncMonth
+
+    queryset = Payment.objects.filter(
+        library=library, status=Payment.Status.SUCCESS, paid_at__date__gte=start, paid_at__date__lte=end
+    )
+
+    def grouped(field):
+        return {
+            row[field]: {"total": str(row["total"]), "count": row["count"]}
+            for row in queryset.values(field).annotate(total=Sum("amount"), count=Count("id"))
+        }
+
+    months = (
+        queryset.annotate(month=TruncMonth("paid_at"))
+        .values("month")
+        .annotate(total=Sum("amount"), count=Count("id"))
+        .order_by("month")
+    )
+    totals = queryset.aggregate(total=Sum("amount"), count=Count("id"))
+    return {
+        "total": str(totals["total"] or 0),
+        "count": totals["count"],
+        "by_method": grouped("method"),
+        "by_purpose": grouped("purpose"),
+        "by_month": [
+            {"month": row["month"].strftime("%Y-%m"), "total": str(row["total"]), "count": row["count"]}
+            for row in months
+        ],
+    }
+
+
+def library_payments_between(library, start: date | None = None, end: date | None = None) -> QuerySet[Payment]:
+    """Every payment row of the library, optionally between two dates (CSV export)."""
+    queryset = (
+        Payment.objects.filter(library=library)
+        .select_related("student", "plan")
+        .annotate(event_at=Coalesce("paid_at", "created_at"))
+        .order_by("-event_at")
+    )
+    if start:
+        queryset = queryset.filter(event_at__date__gte=start)
+    if end:
+        queryset = queryset.filter(event_at__date__lte=end)
+    return queryset

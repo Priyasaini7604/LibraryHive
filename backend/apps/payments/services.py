@@ -136,6 +136,60 @@ def create_order(*, student, hold_id) -> OrderResult:
     )
 
 
+def create_renewal_order(*, student, membership_id, plan_id=None) -> OrderResult:
+    """Create the gateway order for renewing the student's own membership (#41, renewal part, MEM-05).
+
+    Opens when `next_due_date` is within 7 days or already past. The optional `plan_id` changes the plan for
+    the new period and must be active and belong to the same library. The amount is the plan price.
+    """
+    today = business_today()
+    membership = (
+        Membership.objects.select_related("library", "plan", "seat").filter(pk=membership_id, student=student).first()
+    )
+    if membership is None:
+        raise NotFound()
+    plan = membership_services.plan_for_renewal(membership, plan_id)
+    membership_services.require_renewable(membership, today=today)
+
+    amount = plan.price
+    amount_paise = to_paise(amount)
+    receipt = next_receipt_number(today.year)
+    client = gateway.get_gateway()
+    order = client.create_order(
+        amount_paise=amount_paise,
+        receipt=receipt,
+        notes={"membership_id": str(membership.pk), "student_id": str(student.pk)},
+    )
+
+    with transaction.atomic():
+        locked = Membership.objects.select_for_update().get(pk=membership.pk)
+        membership_services.require_renewable(locked, today=today)
+        payment = Payment.objects.create(
+            library=membership.library,
+            student=student,
+            membership=locked,
+            plan=plan,
+            purpose=Payment.Purpose.RENEWAL,
+            channel=Payment.Channel.ONLINE,
+            method=Payment.Method.GATEWAY,
+            amount=amount,
+            currency="INR",
+            gateway_order_id=order.order_id,
+            receipt_number=receipt,
+        )
+    logger.info(
+        "Renewal order created",
+        extra={"order_id": order.order_id, "payment_id": str(payment.pk), "student_id": str(student.pk)},
+    )
+    return OrderResult(
+        payment=payment,
+        key_id=client.key_id,
+        order_id=order.order_id,
+        amount_paise=amount_paise,
+        currency=order.currency,
+    )
+
+
 # --- Confirmation (one function, idempotent) ---------------------------------------------------------------
 
 
@@ -259,6 +313,146 @@ def _confirm_new_membership(payment: Payment, *, gateway_payment_id: str, via: s
     return payment
 
 
+def _confirm_renewal(payment: Payment, *, gateway_payment_id: str, via: str) -> Payment:
+    """Extend the membership once the renewal money is verified (SPEC.md 4.3). The seat is kept.
+
+    Locks Payment (held by the caller) then Membership. If the membership was archived while the student was
+    paying, the money cannot buy a period, so the payment becomes `needs_refund`.
+    """
+    now = timezone.now()
+    membership = (
+        Membership.objects.select_for_update(of=("self",))
+        .select_related("seat", "library", "plan", "student")
+        .get(pk=payment.membership_id)
+    )
+    if membership.state != Membership.State.ACTIVE:
+        _mark_needs_refund(payment, gateway_payment_id=gateway_payment_id, via=via, now=now)
+        return payment
+
+    period_start, period_end = membership_services.apply_renewal(
+        membership=membership, plan=payment.plan, today=business_today(), actor=payment.student
+    )
+    payment.move_to(Payment.Status.SUCCESS)
+    payment.gateway_payment_id = gateway_payment_id
+    payment.verified_via = via
+    payment.paid_at = now
+    payment.period_start = period_start
+    payment.period_end = period_end
+    payment.failure_reason = ""
+    payment.save()
+    audit.record(
+        actor=None,
+        action="payment.status_change",
+        entity_type="payment",
+        entity_id=payment.pk,
+        library=payment.library,
+        changes={"status": ["pending", "success"], "via": via, "receipt": payment.receipt_number},
+    )
+    logger.info(
+        "Renewal payment verified successfully",
+        extra={
+            "order_id": payment.gateway_order_id,
+            "payment_id": str(payment.pk),
+            "student_id": str(payment.student_id),
+        },
+    )
+    _notify_payment_received(
+        payment, membership, student_body=f"Your membership is renewed until {period_end:%d %b %Y}."
+    )
+    return payment
+
+
+def _notify_payment_received(payment: Payment, membership: Membership, *, student_body: str) -> None:
+    """`payment_received` to the student and the owner for a renewal (dedup key SPEC.md 4.5)."""
+    for recipient, body in (
+        (payment.student, student_body),
+        (
+            payment.library.owner,
+            f"{payment.student.name} paid {payment.amount} for a renewal of seat {membership.seat.label}.",
+        ),
+    ):
+        notifications.notify(
+            recipient=recipient,
+            type="payment_received",
+            title="Payment received",
+            body=body,
+            dedup_key=f"payment:{payment.pk}:payment_received:{recipient.pk}",
+            entity=("payment", payment.pk),
+        )
+
+
+OFFLINE_METHODS = (Payment.Method.CASH, Payment.Method.UPI_DIRECT, Payment.Method.BANK_TRANSFER)
+OFFLINE_BACKDATE_DAYS = 30
+
+
+def record_offline_payment(
+    *,
+    membership: Membership,
+    plan,
+    purpose: str,
+    method: str,
+    recorded_by,
+    period_start,
+    period_end,
+    paid_at=None,
+    notes: str = "",
+) -> Payment:
+    """Write the successful offline payment an owner took in person (PAY-07, SPEC.md 4.3).
+
+    Called inside the admission or renewal transaction, which already holds the membership lock. The amount is
+    the plan price, never a client value. `paid_at` defaults to now and may not be in the future or more than
+    30 days back. Gets a receipt number from the sequence, `recorded_by` is the owner, and the student is told.
+    """
+    now = timezone.now()
+    if method not in OFFLINE_METHODS:
+        raise ValidationFailed(details={"method": ["Choose cash, UPI or bank transfer."]})
+    paid_at = paid_at or now
+    if paid_at > now or paid_at < now - timedelta(days=OFFLINE_BACKDATE_DAYS):
+        raise ValidationFailed(
+            details={"paid_at": ["The payment date must be within the last 30 days, not in the future."]}
+        )
+    payment = Payment.objects.create(
+        library=membership.library,
+        student=membership.student,
+        membership=membership,
+        plan=plan,
+        purpose=purpose,
+        channel=Payment.Channel.OFFLINE,
+        method=method,
+        status=Payment.Status.SUCCESS,
+        amount=plan.price,
+        currency="INR",
+        period_start=period_start,
+        period_end=period_end,
+        verified_via=Payment.VerifiedVia.MANUAL,
+        receipt_number=next_receipt_number(business_today().year),
+        recorded_by=recorded_by,
+        notes=notes.strip(),
+        paid_at=paid_at,
+    )
+    audit.record(
+        actor=recorded_by,
+        action="payment.record_offline",
+        entity_type="payment",
+        entity_id=payment.pk,
+        library=membership.library,
+        changes={"receipt": payment.receipt_number, "method": method, "amount": str(payment.amount)},
+    )
+    logger.info(
+        "Offline payment recorded",
+        extra={"payment_id": str(payment.pk), "membership_id": str(membership.pk), "owner_id": str(recorded_by.pk)},
+    )
+    notifications.notify(
+        recipient=membership.student,
+        type="payment_received",
+        title="Payment recorded",
+        body=f"{membership.library.name} recorded your payment of {payment.amount}.",
+        dedup_key=f"payment:{payment.pk}:payment_received:{membership.student_id}",
+        entity=("payment", payment.pk),
+    )
+    return payment
+
+
 @transaction.atomic
 def confirm_payment(*, order_id: str, gateway_payment_id: str, via: str) -> Payment | None:
     """Confirm an online payment once money has been verified by checkout, webhook or reconcile.
@@ -277,11 +471,11 @@ def confirm_payment(*, order_id: str, gateway_payment_id: str, via: str) -> Paym
         return None
     if payment.status in (Payment.Status.SUCCESS, Payment.Status.NEEDS_REFUND):
         return payment
-    if payment.purpose != Payment.Purpose.NEW_MEMBERSHIP:
-        raise ValueError("Confirming a renewal payment arrives with T15.")
     other = Payment.objects.filter(gateway_payment_id=gateway_payment_id).exclude(pk=payment.pk).exists()
     if other:
         raise ValueError("This gateway payment id already belongs to another payment.")
+    if payment.purpose == Payment.Purpose.RENEWAL:
+        return _confirm_renewal(payment, gateway_payment_id=gateway_payment_id, via=via)
     return _confirm_new_membership(payment, gateway_payment_id=gateway_payment_id, via=via)
 
 

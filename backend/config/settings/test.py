@@ -33,6 +33,11 @@ LOGGING = copy.deepcopy(LOGGING)
 LOGGING["root"]["level"] = "CRITICAL"
 for _logger in LOGGING["loggers"].values():
     _logger["level"] = "CRITICAL"
+# The application loggers still build every INFO record, but write it nowhere. Building the record is what
+# validates `extra=` (a reserved key such as "created" raises KeyError), so a bad log call fails the tests that
+# reach it instead of failing in production.
+LOGGING["handlers"]["null"] = {"class": "logging.NullHandler"}
+LOGGING["loggers"]["apps"] = {"handlers": ["null"], "level": "INFO", "propagate": False}
 
 # Uploaded files go to a throwaway directory.
 _TEST_MEDIA = Path(tempfile.mkdtemp(prefix="libraryhive-test-media-"))

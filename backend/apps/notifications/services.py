@@ -96,7 +96,7 @@ def notify_many(specs: list[NotificationSpec]) -> list[Notification]:
 
     logger.info(
         "Notifications created",
-        extra={"requested": len(specs), "created": len(created), "duplicates": len(unique) - len(created)},
+        extra={"requested": len(specs), "inserted": len(created), "duplicates": len(unique) - len(created)},
     )
     return created
 

@@ -78,7 +78,8 @@ def renewal_notifications(*, today: date | None = None) -> dict[str, int]:
         specs.extend(_membership_spec(m, milestone) for m in found)
     created = services.notify_many(specs)
     summary = {**{k: v for k, v in candidates.items()}, "created": len(created)}
-    logger.info("Renewal notifications", extra=summary)
+    # `created` is reserved by the logging module, so the log line uses another name.
+    logger.info("Renewal notifications", extra={**candidates, "inserted": len(created)})
     return summary
 
 

@@ -88,7 +88,7 @@ def create_seats(*, library: Library, actor, specs: list[SeatSpec]) -> tuple[lis
         changes={"created": len(created), "skipped": len(skipped)},
     )
     library_services.refresh_publish_state(library)
-    logger.info("Seats added", extra={"library_id": str(library.pk), "created": len(created), "skipped": len(skipped)})
+    logger.info("Seats added", extra={"library_id": str(library.pk), "added": len(created), "skipped": len(skipped)})
     return created, skipped
 
 

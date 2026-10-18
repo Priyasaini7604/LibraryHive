@@ -46,9 +46,57 @@ class SeatUpdateInput(serializers.Serializer):
 
 
 class OwnerSeatSerializer(serializers.ModelSerializer):
+    """#30: layout, flags, derived status and, for the owner's own seats only, occupant and hold detail.
+
+    Expects seats from `selectors.owner_seat_map`, which attach `status`, `occupant` and `live_hold`.
+    """
+
+    status = serializers.CharField(read_only=True, allow_null=True)
+    occupant = serializers.SerializerMethodField()
+    hold = serializers.SerializerMethodField()
+
     class Meta:
         model = Seat
-        fields = ["id", "label", "row_label", "position", "is_active", "is_disabled", "disabled_reason"]
+        fields = [
+            "id",
+            "label",
+            "row_label",
+            "position",
+            "is_active",
+            "is_disabled",
+            "disabled_reason",
+            "status",
+            "occupant",
+            "hold",
+        ]
+        read_only_fields = fields
+
+    def get_occupant(self, seat) -> dict | None:
+        occupant = getattr(seat, "occupant", None)
+        if occupant is None:
+            return None
+        return {"membership_id": str(occupant["membership_id"]), "student_name": occupant["student_name"]}
+
+    def get_hold(self, seat) -> dict | None:
+        hold = getattr(seat, "live_hold", None)
+        if hold is None:
+            return None
+        detail = {"id": str(hold.pk), "kind": hold.kind}
+        if hold.kind == SeatHold.Kind.BOOKING:
+            detail.update(student_name=hold.student.name, expires_at=hold.expires_at)
+        else:
+            detail["reason"] = hold.reason
+        return detail
+
+
+class PublicSeatSerializer(serializers.ModelSerializer):
+    """#16: layout and derived status only. Who holds or occupies a seat is never included."""
+
+    status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Seat
+        fields = ["id", "label", "row_label", "position", "status"]
         read_only_fields = fields
 
 

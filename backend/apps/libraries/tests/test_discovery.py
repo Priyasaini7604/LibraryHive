@@ -63,7 +63,7 @@ class DiscoveryTests(LibraryTestCase):
         self.assertEqual(item["starting_price"], "900.00")
         self.assertEqual(item["domains"], ["upsc"])
         self.assertEqual(item["amenities"], ["wifi"])
-        self.assertNotIn("seat_counts", item)  # never faked before seats exist
+        self.assertEqual(item["seat_counts"], {"total": 0, "empty": 0, "reserved": 0, "occupied": 0})
         self.assertNotIn("distance_km", item)
         self.assertNotIn("contact_email", item)
 
@@ -109,7 +109,6 @@ class DiscoveryTests(LibraryTestCase):
             {"sort": "distance"},
             {"radius_km": 51, "lat": 25, "lng": 81},
             {"sort": "bogus"},
-            {"sort": "available"},  # needs seat data (T10); refused rather than faked
         ]:
             response = self.client.get(self.api("libraries/"), params)
             self.assertEqual(response.status_code, 400, params)
@@ -135,7 +134,7 @@ class DiscoveryTests(LibraryTestCase):
         self.assertEqual(set(data["plans"][0]), {"id", "name", "duration_days", "price", "timing_note"})
         self.assertEqual({a["code"] for a in data["amenities"]}, {"wifi"})
         self.assertNotIn("domain_breakdown", data)  # added by T23, never faked
-        self.assertNotIn("seat_counts", data)
+        self.assertEqual(data["seat_counts"], {"total": 0, "empty": 0, "reserved": 0, "occupied": 0})
         self.assertNotIn("owner", data)
         self.assertNotIn("is_published", data)
 

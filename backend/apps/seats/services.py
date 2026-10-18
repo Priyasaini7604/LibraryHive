@@ -1,10 +1,8 @@
 """All seat state changes (BACKEND_ARCHITECTURE.md section 8, SPEC.md 3.8).
 
 Views only parse, check permissions, call these and wrap the result.
-Removing (#33) and disabling (#34) a seat are still not here: both must refuse a
-seat with an active membership or a live hold. The pieces now exist (T11 and T12),
-and the guard is added together with the derived seat status (T10 completion),
-never as an unguarded shortcut.
+Removing (#33) and disabling (#34) a seat both refuse a seat that has a non-archived
+membership or a live hold (409 SEAT_IN_USE), decided under the seat lock.
 """
 
 import logging
@@ -83,7 +81,7 @@ def create_seats(*, library: Library, actor, specs: list[SeatSpec]) -> tuple[lis
 
     audit.record(
         actor=actor,
-        action="seat.create",
+        action="seat.create_batch",
         entity_type="library",
         entity_id=library.pk,
         library=library,
@@ -367,3 +365,63 @@ def _release_hold(*, library: Library, hold: SeatHold, actor, reason: str) -> Se
     )
     logger.info("Seat hold released", extra={"hold_id": str(hold.pk), "actor_id": str(actor.pk)})
     return hold
+
+
+def _in_use(seat: Seat, *, now) -> bool:
+    """A non-archived membership or a live hold: the seat cannot be removed or taken out of service."""
+    expire_dead_holds_for_seat(seat, now=now)
+    return _memberships().active_membership_exists(seat) or SeatHold.objects.live(now).filter(seat=seat).exists()
+
+
+@transaction.atomic
+def deactivate_seat(*, library: Library, seat: Seat, actor, reason: str) -> Seat:
+    """Remove a seat softly (#33, SEAT-02). The row, its holds and its memberships are kept as history.
+
+    Refused while the seat has a non-archived membership or a live hold. Idempotent for a removed seat.
+    """
+    seat = _locked_seat(library, seat)
+    if not seat.is_active:
+        return seat
+    if _in_use(seat, now=timezone.now()):
+        raise Conflict("This seat has an active member or hold. Archive or release it first.", code="SEAT_IN_USE")
+    seat.is_active = False
+    seat.is_disabled = False  # a removed seat is not "in maintenance" (seat_disabled_is_active)
+    seat.disabled_reason = ""
+    seat.save(update_fields=["is_active", "is_disabled", "disabled_reason", "updated_at"])
+    audit.record(
+        actor=actor,
+        action="seat.deactivate",
+        entity_type="seat",
+        entity_id=seat.pk,
+        library=library,
+        changes={"label": seat.label},
+        reason=reason.strip(),
+    )
+    library_services.refresh_publish_state(library)
+    logger.info("Seat removed", extra={"seat_id": str(seat.pk)})
+    return seat
+
+
+@transaction.atomic
+def disable_seat(*, library: Library, seat: Seat, actor, reason: str) -> Seat:
+    """Take a seat out of service for maintenance (#34, SEAT-04). Same guard as removal. Idempotent."""
+    seat = _locked_seat(library, seat)
+    if not seat.is_active:
+        raise NotFound()
+    if seat.is_disabled:
+        return seat
+    if _in_use(seat, now=timezone.now()):
+        raise Conflict("This seat has an active member or hold. Archive or release it first.", code="SEAT_IN_USE")
+    seat.is_disabled = True
+    seat.disabled_reason = reason.strip()
+    seat.save(update_fields=["is_disabled", "disabled_reason", "updated_at"])
+    audit.record(
+        actor=actor,
+        action="seat.disable",
+        entity_type="seat",
+        entity_id=seat.pk,
+        library=library,
+        changes={"label": seat.label},
+        reason=seat.disabled_reason,
+    )
+    return seat

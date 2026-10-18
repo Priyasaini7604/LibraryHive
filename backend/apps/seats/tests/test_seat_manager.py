@@ -56,8 +56,20 @@ class CreateSeatsTests(SeatApiTestCase):
         self.assertFalse(seat.is_disabled)
         self.assertEqual(
             set(data["created"][0]),
-            {"id", "label", "row_label", "position", "is_active", "is_disabled", "disabled_reason"},
+            {
+                "id",
+                "label",
+                "row_label",
+                "position",
+                "is_active",
+                "is_disabled",
+                "disabled_reason",
+                "status",
+                "occupant",
+                "hold",
+            },
         )
+        self.assertEqual({s["status"] for s in data["created"]}, {"empty"})
 
     def test_status_is_never_client_writable_or_exposed_before_it_is_derived(self):
         response = self.owner.post(
@@ -68,7 +80,9 @@ class CreateSeatsTests(SeatApiTestCase):
         self.assertEqual(response.status_code, 201)
         seat = Seat.objects.get(label="Z-1")
         self.assertFalse(seat.is_disabled)
-        self.assertNotIn("status", response.json()["data"]["created"][0])
+        self.assertEqual(
+            response.json()["data"]["created"][0]["status"], "empty"
+        )  # derived, never taken from the client
 
     def test_rerunning_a_grid_skips_existing_seats_and_never_resets_them(self):
         self.grid(per_row=2)
@@ -141,7 +155,7 @@ class CreateSeatsTests(SeatApiTestCase):
     def test_creation_is_audited_with_counts_and_library(self):
         self.grid(per_row=2)
         self.grid(per_row=3)
-        rows = list(AuditLog.objects.filter(action="seat.create", library=self.library).order_by("created_at"))
+        rows = list(AuditLog.objects.filter(action="seat.create_batch", library=self.library).order_by("created_at"))
         self.assertEqual([r.changes for r in rows], [{"created": 4, "skipped": 0}, {"created": 2, "skipped": 4}])
         self.assertTrue(all(r.actor_id == self.library.owner_id for r in rows))
 
@@ -167,7 +181,7 @@ class ListSeatsTests(SeatApiTestCase):
         Seat.objects.filter(label="A-2").update(is_active=False)
         data = self.owner.get(SEATS).json()["data"]
         self.assertEqual([s["label"] for s in data["seats"]], ["A-1", "B-1", "B-2"])
-        self.assertEqual(data["counts"], {"total": 3})
+        self.assertEqual(data["counts"], {"total": 3, "empty": 3, "reserved": 0, "occupied": 0})
 
     def test_include_inactive_shows_removed_seats_but_not_in_the_total(self):
         self.grid(rows=("A",), per_row=2)
@@ -268,9 +282,8 @@ class ConstraintTests(TestCase):
         with self.assertRaises(ProtectedError):
             self.library.delete()
 
-    def test_unfinished_derived_status_is_not_faked(self):
+    def test_active_seat_count_starts_at_zero(self):
         self.assertEqual(selectors.active_seat_count(self.library), 0)
-        self.assertFalse(hasattr(selectors, "seat_counts_by_library"))
 
 
 class ConcurrentCreateTests(TransactionTestCase):

@@ -1,19 +1,16 @@
-"""Owner seat manager endpoints #30-#32, #35-#37 and the student booking-hold endpoints #38-#40.
-
-Not here yet, by design: #16 (public seat map) and the status, occupant, hold
-and counts fields of #30 need the derived seat status (SPEC.md 4.1); #33 and #34
-need its in-use guard. See IMPLEMENTATION_PLAN.md T10.
-"""
+"""Public seat map #16, owner seat manager #30-#37 and the student booking-hold endpoints #38-#40."""
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.parsers import JSONParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.core.exceptions import NotFound
 from apps.core.mixins import OwnerLibraryScopedMixin, StudentOwnedScopedMixin
 from apps.core.permissions import HasLibrary, IsOwner, IsStudent
 from apps.core.responses import created, ok
+from apps.libraries import selectors as library_selectors
 
 from . import selectors, services
 from .models import Seat, SeatHold
@@ -21,6 +18,7 @@ from .serializers import (
     CreateHoldInput,
     OwnerHoldSerializer,
     OwnerSeatSerializer,
+    PublicSeatSerializer,
     ReasonInput,
     SeatCreateInput,
     SeatUpdateInput,
@@ -28,24 +26,44 @@ from .serializers import (
 )
 
 
+class PublicSeatMapView(APIView):
+    """#16: the live seat map of a published library. Never reveals who holds or occupies a seat."""
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    @extend_schema(responses={200: PublicSeatSerializer(many=True)})
+    def get(self, request, library_id):
+        library = library_selectors.public_library(library_id)
+        if library is None:
+            raise NotFound()
+        data = {
+            "seats": PublicSeatSerializer(selectors.seat_map(library), many=True).data,
+            "counts": selectors.library_seat_counts(library),
+        }
+        return ok(data, headers={"Cache-Control": "no-store"})
+
+
 class _OwnerSeatView(OwnerLibraryScopedMixin, APIView):
     permission_classes = [IsAuthenticated, IsOwner, HasLibrary]
     parser_classes = [JSONParser]
     model = Seat
 
+    def seat_detail(self, seat):
+        """The seat as the manager shows it: derived status plus occupant and hold detail."""
+        return selectors.owner_seat_map(self.request.user.library, include_inactive=True, seat_ids=[seat.pk])[0]
+
 
 class OwnerSeatListView(_OwnerSeatView):
-    """#30 (inventory part): the owner's seats; #31 add seats."""
+    """#30 the seat manager and owner seat map; #31 add seats."""
 
     @extend_schema(responses={200: OwnerSeatSerializer(many=True)})
     def get(self, request):
         include_inactive = request.query_params.get("include_inactive", "").lower() in ("1", "true", "yes")
-        seats = selectors.library_seats(request.user.library, include_inactive=include_inactive)
+        library = request.user.library
+        seats = selectors.owner_seat_map(library, include_inactive=include_inactive)
         return ok(
-            {
-                "seats": OwnerSeatSerializer(seats, many=True).data,
-                "counts": {"total": selectors.active_seat_count(request.user.library)},
-            }
+            {"seats": OwnerSeatSerializer(seats, many=True).data, "counts": selectors.library_seat_counts(library)}
         )
 
     @extend_schema(request=SeatCreateInput, responses={201: None})
@@ -63,7 +81,8 @@ class OwnerSeatListView(_OwnerSeatView):
                 for item in values["seats"]
             ]
         seats, skipped = services.create_seats(library=request.user.library, actor=request.user, specs=specs)
-        return created({"created": OwnerSeatSerializer(seats, many=True).data, "skipped": skipped})
+        detail = selectors.owner_seat_map(request.user.library, seat_ids=[seat.pk for seat in seats])
+        return created({"created": OwnerSeatSerializer(detail, many=True).data, "skipped": skipped})
 
 
 class OwnerSeatDetailView(_OwnerSeatView):
@@ -77,7 +96,7 @@ class OwnerSeatDetailView(_OwnerSeatView):
         seat = services.update_seat(
             library=request.user.library, seat=seat, actor=request.user, data=data.validated_data
         )
-        return ok(OwnerSeatSerializer(seat).data)
+        return ok(OwnerSeatSerializer(self.seat_detail(seat)).data)
 
 
 class OwnerSeatEnableView(_OwnerSeatView):
@@ -87,7 +106,35 @@ class OwnerSeatEnableView(_OwnerSeatView):
     def post(self, request, seat_id):
         seat = self.get_scoped_object(pk=seat_id)
         seat = services.enable_seat(library=request.user.library, seat=seat, actor=request.user)
-        return ok(OwnerSeatSerializer(seat).data)
+        return ok(OwnerSeatSerializer(self.seat_detail(seat)).data)
+
+
+class OwnerSeatDeactivateView(_OwnerSeatView):
+    """#33 remove a seat (soft). Refused while it has a member or a live hold."""
+
+    @extend_schema(request=ReasonInput, responses={200: OwnerSeatSerializer})
+    def post(self, request, seat_id):
+        seat = self.get_scoped_object(pk=seat_id)
+        data = ReasonInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        seat = services.deactivate_seat(
+            library=request.user.library, seat=seat, actor=request.user, reason=data.validated_data["reason"]
+        )
+        return ok(OwnerSeatSerializer(self.seat_detail(seat)).data)
+
+
+class OwnerSeatDisableView(_OwnerSeatView):
+    """#34 take a seat out of service for maintenance. Same guard as #33."""
+
+    @extend_schema(request=ReasonInput, responses={200: OwnerSeatSerializer})
+    def post(self, request, seat_id):
+        seat = self.get_scoped_object(pk=seat_id)
+        data = ReasonInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        seat = services.disable_seat(
+            library=request.user.library, seat=seat, actor=request.user, reason=data.validated_data["reason"]
+        )
+        return ok(OwnerSeatSerializer(self.seat_detail(seat)).data)
 
 
 class OwnerManualHoldView(_OwnerSeatView):

@@ -8,6 +8,7 @@ from django.urls import include, path
 api_v1 = [
     path("", include("apps.core.urls")),
     path("auth/", include("apps.accounts.urls")),
+    path("notifications/", include("apps.notifications.urls")),
 ]
 
 urlpatterns = [

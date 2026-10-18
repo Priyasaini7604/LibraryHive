@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "storages",
     "apps.core",
     "apps.accounts",
+    "apps.notifications",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -251,6 +252,8 @@ ADMIN_URL = config("ADMIN_URL", default="admin/")
 # --- Email ----------------------------------------------------------------------
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="LibraryHive <no-reply@localhost>")
+# When false, notify() still writes the in-app notification but creates no email delivery row.
+EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
 
 # --- Logging (BACKEND_ARCHITECTURE.md section 14, SECURITY.md section 16) --------
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")

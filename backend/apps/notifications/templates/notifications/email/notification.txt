@@ -1,0 +1,5 @@
+Hi {{ name }},
+
+{{ body }}
+
+You are receiving this because of activity on your LibraryHive account. You can also see it in your notification centre after you log in.

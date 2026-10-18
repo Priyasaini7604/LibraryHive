@@ -2,7 +2,24 @@
 
 import { api, refreshAccessToken } from "../api-client";
 import { tokenStore } from "../auth";
-import type { ClaimChannel, ClaimStartResponse, LoginResponse, MessageResponse, User } from "../types";
+import type { ClaimChannel, ClaimStartResponse, LoginResponse, MessageResponse, Role, User, Vocabulary } from "../types";
+
+export interface RegisterInput {
+  role: Role;
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  domain_code?: string;
+}
+
+export interface ClaimCompleteInput {
+  phone: string;
+  code: string;
+  password: string;
+  email?: string;
+  name?: string;
+}
 
 export async function login(email: string, password: string): Promise<User> {
   const result = await api.post<LoginResponse>("/auth/login/", { email, password }, { auth: false });
@@ -20,6 +37,23 @@ export async function logout(): Promise<void> {
 
 export function fetchMe(): Promise<User> {
   return api.get<User>("/auth/me/");
+}
+
+/** Create an owner or student account and sign it in (#6). Throws CLAIM_REQUIRED when an offline record matches. */
+export async function register(input: RegisterInput): Promise<User> {
+  const result = await api.post<LoginResponse>("/auth/register/", input, { auth: false });
+  tokenStore.set(result.access);
+  return result.user;
+}
+
+/** Edit name, phone and (students) exam domain (#11). Email is not editable. */
+export function updateProfile(input: { name?: string; phone?: string; domain_code?: string | null }): Promise<User> {
+  return api.patch<User>("/auth/me/", input);
+}
+
+/** Public exam-domain vocabulary (#2). */
+export function fetchDomains(): Promise<Vocabulary[]> {
+  return api.get<Vocabulary[]>("/meta/domains/", { auth: false });
 }
 
 /** Restore a session on page load from the HttpOnly refresh cookie. */
@@ -54,13 +88,7 @@ export function startClaim(input: { phone: string; channel: ClaimChannel; email?
 }
 
 /** Finish the claim with the emailed or owner-issued code (#13). Signs the student in like login. */
-export async function completeClaim(input: {
-  phone: string;
-  code: string;
-  password: string;
-  email?: string;
-  name?: string;
-}): Promise<User> {
+export async function completeClaim(input: ClaimCompleteInput): Promise<User> {
   const result = await api.post<LoginResponse>("/auth/claim/complete/", input, { auth: false });
   tokenStore.set(result.access);
   return result.user;

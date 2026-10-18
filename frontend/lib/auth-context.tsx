@@ -22,6 +22,12 @@ export interface AuthContextValue {
   status: AuthStatus;
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
+  /** Create an account and sign in (#6). */
+  register: (input: authApi.RegisterInput) => Promise<User>;
+  /** Finish claiming an offline account and sign in (#13). */
+  completeClaim: (input: authApi.ClaimCompleteInput) => Promise<User>;
+  /** Use the user returned by a profile update without another request. */
+  setUser: (user: User) => void;
   logout: () => Promise<void>;
   /** Reload the current user (e.g. after a profile change or library creation). */
   reloadUser: () => Promise<void>;
@@ -95,6 +101,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return loggedIn;
   }, []);
 
+  const register = useCallback(async (input: authApi.RegisterInput) => {
+    const signedIn = await authApi.register(input);
+    setUser(signedIn);
+    setStatus("authenticated");
+    return signedIn;
+  }, []);
+
+  const completeClaim = useCallback(async (input: authApi.ClaimCompleteInput) => {
+    const signedIn = await authApi.completeClaim(input);
+    setUser(signedIn);
+    setStatus("authenticated");
+    return signedIn;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -105,8 +125,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [signOutLocally]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, logout, reloadUser }),
-    [status, user, login, logout, reloadUser],
+    () => ({ status, user, login, register, completeClaim, setUser, logout, reloadUser }),
+    [status, user, login, register, completeClaim, logout, reloadUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

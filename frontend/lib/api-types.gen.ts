@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/auth/claim/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description #13: finish the claim, set a password and sign in (sets the refresh cookie). */
+        post: operations["auth_claim_complete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/claim/start/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description #12: begin claiming an offline account. Neutral response for every phone. */
+        post: operations["auth_claim_start_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login/": {
         parameters: {
             query?: never;
@@ -193,6 +227,28 @@ export interface components {
             access: string;
             user: components["schemas"]["User"];
         };
+        /**
+         * @description * `email_otp` - Email code
+         *     * `owner_code` - Owner code
+         * @enum {string}
+         */
+        ChannelEnum: "email_otp" | "owner_code";
+        ClaimCompleteInputRequest: {
+            phone: string;
+            code: string;
+            password: string;
+            email?: string;
+            name?: string;
+        };
+        ClaimStartInputRequest: {
+            phone: string;
+            email?: string;
+            channel: components["schemas"]["ChannelEnum"];
+        };
+        ClaimStartOutput: {
+            channel: string;
+            masked_email: string | null;
+        };
         Domain: {
             code: string;
             name: string;
@@ -257,6 +313,52 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auth_claim_complete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimCompleteInputRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthOutput"];
+                };
+            };
+        };
+    };
+    auth_claim_start_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimStartInputRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimStartOutput"];
+                };
+            };
+        };
+    };
     auth_login_create: {
         parameters: {
             query?: never;

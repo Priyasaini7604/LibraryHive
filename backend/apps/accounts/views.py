@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from apps.core.responses import created, error_response, ok
 
-from . import password_reset, services, tokens
+from . import claims, password_reset, services, tokens
 from .cookies import (
     FrontendOriginRequired,
     JsonRequestRequired,
@@ -21,6 +21,9 @@ from .cookies import (
 from .serializers import (
     AccessTokenOutput,
     AuthOutput,
+    ClaimCompleteInput,
+    ClaimStartInput,
+    ClaimStartOutput,
     LoginInput,
     MessageOutput,
     PasswordResetConfirmInput,
@@ -29,7 +32,7 @@ from .serializers import (
     RegisterInput,
     UserSerializer,
 )
-from .throttles import LoginEmailThrottle, PasswordResetEmailThrottle
+from .throttles import ClaimStartIdentityThrottle, LoginEmailThrottle, PasswordResetEmailThrottle
 
 security_logger = logging.getLogger("apps.security")
 
@@ -167,3 +170,38 @@ class PasswordResetConfirmView(APIView):
         data = PasswordResetConfirmInput(data=request.data)
         data.is_valid(raise_exception=True)
         return ok({"message": password_reset.confirm_password_reset(**data.validated_data)})
+
+
+class ClaimStartView(APIView):
+    """#12: begin claiming an offline account. Neutral response for every phone."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+    throttle_classes = [ScopedRateThrottle, ClaimStartIdentityThrottle]
+    throttle_scope = "claim_start"
+
+    @extend_schema(request=ClaimStartInput, responses={200: ClaimStartOutput})
+    def post(self, request):
+        data = ClaimStartInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        return ok(claims.start_claim(**data.validated_data))
+
+
+class ClaimCompleteView(APIView):
+    """#13: finish the claim, set a password and sign in (sets the refresh cookie)."""
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny, FrontendOriginRequired, JsonRequestRequired]
+    parser_classes = [JSONParser]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "claim_complete"
+
+    @extend_schema(request=ClaimCompleteInput, responses={200: AuthOutput})
+    def post(self, request):
+        data = ClaimCompleteInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        result = claims.complete_claim(**data.validated_data)
+        response = ok(_auth_payload(result))
+        set_refresh_cookie(response, result.tokens.refresh)
+        return response

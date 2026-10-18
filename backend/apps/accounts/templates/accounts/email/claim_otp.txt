@@ -1,0 +1,11 @@
+Hi {{ name }},
+
+A library added you as a member on LibraryHive. Your code to link it to your account is:
+
+    {{ code }}
+
+It is valid for {{ minutes }} minutes and can be used once.
+
+If you did not ask to claim this account, you can ignore this email. Nothing has changed.
+
+Never share this code with anyone. LibraryHive will never ask you for it.

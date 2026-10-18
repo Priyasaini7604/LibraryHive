@@ -204,6 +204,7 @@ REST_FRAMEWORK = {
         "login_email": "20/hour",
         "register": "5/min",
         "claim_start": "10/hour",
+        "claim_start_identity": "3/10min",
         "claim_complete": "10/min",
         "password_reset": "10/hour",
         "password_reset_email": "3/10min",
@@ -247,6 +248,8 @@ SPECTACULAR_SETTINGS = {
     "ENUM_NAME_OVERRIDES": {
         "PaymentStatusEnum": "apps.payments.models.Payment.Status",
         "PaymentMethodEnum": "apps.payments.models.Payment.Method",
+        "PaymentChannelEnum": "apps.payments.models.Payment.Channel",
+        "ClaimChannelEnum": "apps.accounts.models.AccountClaim.Channel",
         "OfflinePaymentMethodEnum": "apps.memberships.serializers.OFFLINE_METHOD_CHOICES",
         "ComplaintStatusEnum": "apps.complaints.models.Complaint.Status",
         "VisitStatusEnum": "apps.visits.models.VisitRequest.Status",

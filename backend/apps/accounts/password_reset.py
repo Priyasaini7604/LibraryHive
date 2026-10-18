@@ -85,7 +85,7 @@ def _clear_failures(email: str) -> None:
     cache.delete(_failure_key(email))
 
 
-def _send(template: str, subject: str, user: User, **context) -> bool:
+def send_email(template: str, subject: str, user: User, **context) -> bool:
     body = render_to_string(f"accounts/email/{template}.txt", {"name": user.name, **context})
     try:
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=False)
@@ -96,11 +96,11 @@ def _send(template: str, subject: str, user: User, **context) -> bool:
     return True
 
 
-def _new_code() -> str:
+def new_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _pad_to_minimum(started: float) -> None:
+def pad_to_minimum(started: float) -> None:
     """Make every request take at least the configured time, hiding whether work was done."""
     remaining = settings.PASSWORD_RESET_MIN_RESPONSE_SECONDS - (time.monotonic() - started)
     if remaining > 0:
@@ -116,7 +116,7 @@ def request_password_reset(*, email: str) -> str:
 
     code = None
     if user is not None:
-        code = _new_code()
+        code = new_code()
         now = timezone.now()
         with transaction.atomic():
             AccountClaim.objects.filter(
@@ -128,7 +128,7 @@ def request_password_reset(*, email: str) -> str:
                 code_hash=make_password(code),
                 expires_at=now + timedelta(minutes=settings.PASSWORD_RESET_MINUTES),
             )
-        _send(
+        send_email(
             "password_reset",
             "Your LibraryHive password reset code",
             user,
@@ -139,7 +139,7 @@ def request_password_reset(*, email: str) -> str:
         make_password("000000")  # comparable hashing cost for unknown accounts
 
     security_logger.info("auth.password_reset_requested", extra={"email": email, "account_found": user is not None})
-    _pad_to_minimum(started)
+    pad_to_minimum(started)
     return REQUEST_MESSAGE
 
 
@@ -225,5 +225,5 @@ def confirm_password_reset(*, email: str, code: str, new_password: str) -> str:
 
     _clear_failures(email)
     security_logger.info("auth.password_reset_completed", extra={"reset_user_id": str(user.pk), "sessions": revoked})
-    _send("password_changed", "Your LibraryHive password was changed", user)
+    send_email("password_changed", "Your LibraryHive password was changed", user)
     return CONFIRM_MESSAGE

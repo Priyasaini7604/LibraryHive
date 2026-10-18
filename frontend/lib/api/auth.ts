@@ -2,7 +2,7 @@
 
 import { api, refreshAccessToken } from "../api-client";
 import { tokenStore } from "../auth";
-import type { LoginResponse, MessageResponse, User } from "../types";
+import type { ClaimChannel, ClaimStartResponse, LoginResponse, MessageResponse, User } from "../types";
 
 export async function login(email: string, password: string): Promise<User> {
   const result = await api.post<LoginResponse>("/auth/login/", { email, password }, { auth: false });
@@ -42,4 +42,26 @@ export function confirmPasswordReset(input: { email: string; code: string; newPa
     { email: input.email, code: input.code, new_password: input.newPassword },
     { auth: false },
   );
+}
+
+/**
+ * Begin claiming an offline account (#12). The answer is the same for every phone, so the UI
+ * must always show the neutral "check your email" step. A record with no email on file gets
+ * CLAIM_INVALID: the student must ask the library for a claim code instead.
+ */
+export function startClaim(input: { phone: string; channel: ClaimChannel; email?: string }): Promise<ClaimStartResponse> {
+  return api.post<ClaimStartResponse>("/auth/claim/start/", input, { auth: false });
+}
+
+/** Finish the claim with the emailed or owner-issued code (#13). Signs the student in like login. */
+export async function completeClaim(input: {
+  phone: string;
+  code: string;
+  password: string;
+  email?: string;
+  name?: string;
+}): Promise<User> {
+  const result = await api.post<LoginResponse>("/auth/claim/complete/", input, { auth: false });
+  tokenStore.set(result.access);
+  return result.user;
 }

@@ -177,3 +177,12 @@ export interface LibraryFilters {
 }
 
 export * from "./ops-types";
+
+/** How a student proves they own an offline record (#12). */
+export type ClaimChannel = "email_otp" | "owner_code";
+
+/** Response of claim start (#12). `masked_email` echoes the email the caller typed, never the one on file. */
+export interface ClaimStartResponse {
+  channel: ClaimChannel;
+  masked_email: string | null;
+}

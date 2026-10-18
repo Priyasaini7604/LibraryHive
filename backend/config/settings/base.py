@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.seats",
     "apps.memberships",
     "apps.notifications",
+    "apps.payments",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -257,6 +258,12 @@ EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.conso
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="LibraryHive <no-reply@localhost>")
 # When false, notify() still writes the in-app notification but creates no email delivery row.
 EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
+
+# --- Payments (SECURITY.md section 10): secrets come from the environment only, never from code -----
+RAZORPAY_KEY_ID = config("RAZORPAY_KEY_ID", default="")
+RAZORPAY_KEY_SECRET = config("RAZORPAY_KEY_SECRET", default="")
+RAZORPAY_WEBHOOK_SECRET = config("RAZORPAY_WEBHOOK_SECRET", default="")
+PAYMENT_RECONCILE_AFTER_MINUTES = config("PAYMENT_RECONCILE_AFTER_MINUTES", default=30, cast=int)
 
 # --- Logging (BACKEND_ARCHITECTURE.md section 14, SECURITY.md section 16) --------
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")

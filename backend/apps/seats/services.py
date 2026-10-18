@@ -149,6 +149,13 @@ def _memberships():
     return selectors
 
 
+def _payments():
+    """`payments.services`, imported lazily because payments imports seats (no import cycle at load time)."""
+    from apps.payments import services
+
+    return services
+
+
 def _locked_seat_by_id(seat_id, *, library: Library | None = None) -> Seat:
     queryset = Seat.objects.select_for_update().select_related("library").filter(is_active=True)
     if library is not None:
@@ -286,6 +293,8 @@ def cancel_hold(*, student, hold: SeatHold) -> SeatHold:
 @transaction.atomic
 def _cancel_hold(*, student, hold: SeatHold) -> SeatHold | None:
     now = timezone.now()
+    payments = _payments()
+    pending = payments.lock_pending_for_hold(hold.pk)  # Payment before Seat, as confirm_payment does
     hold = _own_pending_hold_for_update(hold=hold)
     if hold.student_id != student.pk or hold.kind != SeatHold.Kind.BOOKING:
         raise NotFound()
@@ -294,6 +303,7 @@ def _cancel_hold(*, student, hold: SeatHold) -> SeatHold | None:
     hold.status = SeatHold.Status.CANCELLED
     hold.closed_at = now
     hold.save(update_fields=["status", "closed_at", "updated_at"])
+    payments.cancel_locked(pending)  # #40: any pending Payment for the hold becomes cancelled
     audit.record(actor=student, action="hold.cancel", entity_type="seat_hold", entity_id=hold.pk, library=hold.library)
     logger.info("Seat hold cancelled", extra={"hold_id": str(hold.pk), "student_id": str(student.pk)})
     return hold

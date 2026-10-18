@@ -20,6 +20,11 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
+# Dummy payment secrets so the real HMAC code paths run; the fake gateway never calls Razorpay.
+RAZORPAY_KEY_ID = "rzp_test_unit_tests"
+RAZORPAY_KEY_SECRET = "unit-test-key-secret"
+RAZORPAY_WEBHOOK_SECRET = "unit-test-webhook-secret"
+
 # No artificial delay in tests (a dedicated test checks the padding).
 PASSWORD_RESET_MIN_RESPONSE_SECONDS = 0
 

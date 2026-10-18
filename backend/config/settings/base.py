@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.libraries",
+    "apps.memberships",
 ]
 
 AUTH_USER_MODEL = "accounts.User"

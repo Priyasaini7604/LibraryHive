@@ -26,14 +26,20 @@ def active_seat_count(library: Library) -> int:
     return seats.active_seat_count(library) if seats else 0
 
 
-def seat_counts_by_library(library_ids: list) -> dict | None:
-    """{library_id: {total, empty, reserved, occupied}}, or None while seats do not exist yet."""
+def _seat_counts_provider():
+    """`seats.selectors.seat_counts_by_library`, once the derived seat status exists (T11 completion, T12)."""
     seats = _seat_selectors()
-    return seats.seat_counts_by_library(library_ids) if seats else None
+    return getattr(seats, "seat_counts_by_library", None) if seats else None
+
+
+def seat_counts_by_library(library_ids: list) -> dict | None:
+    """{library_id: {total, empty, reserved, occupied}}, or None while the seat status is not available yet."""
+    provider = _seat_counts_provider()
+    return provider(library_ids) if provider else None
 
 
 def seat_counts_available() -> bool:
-    return _seat_selectors() is not None
+    return _seat_counts_provider() is not None
 
 
 def plan_in_use(plan: PricingPlan) -> bool:

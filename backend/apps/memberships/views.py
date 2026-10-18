@@ -125,6 +125,17 @@ class OwnerArchiveView(APIView):
         return ok(serializers.member_row(_annotated(membership)))
 
 
+class ClaimCodeView(APIView):
+    """#55: issue a one-time claim code for an offline student. The code is shown once and never stored."""
+
+    permission_classes = OWNER
+
+    @extend_schema(request=None, responses={201: None})
+    def post(self, request, student_id):
+        code, claim = services.issue_claim_code(library=request.user.library, owner=request.user, student_id=student_id)
+        return created({"code": code, "expires_at": claim.expires_at}, headers={"Cache-Control": "no-store"})
+
+
 class AdmissionLookupView(APIView):
     """#53: pre-check an identity before admitting a walk-in student."""
 

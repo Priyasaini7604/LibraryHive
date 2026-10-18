@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ClaimCodeDialog } from "@/components/owner/claim-code-dialog";
 import { RecordRenewalDialog } from "@/components/owner/record-renewal-dialog";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -25,6 +26,7 @@ export function MemberDetailScreen({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const [renewing, setRenewing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const query = useQuery({ queryKey: queryKeys.ownerMember(id), queryFn: () => fetchMember(id) });
 
@@ -103,7 +105,12 @@ export function MemberDetailScreen({ id }: { id: string }) {
             </Fact>
             {m.student.is_offline && (
               <Fact label="Account">
-                <Badge>Not signed up yet</Badge>
+                <span className="flex flex-wrap items-center gap-2">
+                  <Badge>Not signed up yet</Badge>
+                  <Button size="sm" variant="secondary" onClick={() => setClaiming(true)}>
+                    Give a claim code
+                  </Button>
+                </span>
               </Fact>
             )}
             {ended && m.archive_reason && <Fact label="Reason for ending">{m.archive_reason}</Fact>}
@@ -158,6 +165,7 @@ export function MemberDetailScreen({ id }: { id: string }) {
         </section>
       )}
 
+      {claiming && <ClaimCodeDialog studentId={m.student.id} studentName={m.student.name} onClose={() => setClaiming(false)} />}
       {renewing && <RecordRenewalDialog membershipId={m.membership_id} studentName={m.student.name} currentPlanId={m.plan.id} onClose={() => setRenewing(false)} />}
       <ReasonDialog
         open={archiving}

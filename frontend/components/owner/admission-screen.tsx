@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { ClaimCodeDialog } from "@/components/owner/claim-code-dialog";
 import { OFFLINE_METHOD_OPTIONS } from "@/components/owner/record-renewal-dialog";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/choice";
@@ -57,6 +58,7 @@ export function AdmissionScreen({ initialSeatId }: { initialSeatId?: string }) {
   const [lookup, setLookup] = useState<LookupState>({ kind: "idle" });
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState<AdmissionResult | null>(null);
+  const [claiming, setClaiming] = useState(false);
 
   const seats = useQuery({ queryKey: queryKeys.ownerSeats, queryFn: () => fetchOwnerSeats() });
   const plans = useQuery({ queryKey: queryKeys.ownerPlans, queryFn: fetchOwnerPlans });
@@ -149,6 +151,11 @@ export function AdmissionScreen({ initialSeatId }: { initialSeatId?: string }) {
             <Button asChild>
               <Link href={`/owner/members/${done.membership.membership_id}`}>View member</Link>
             </Button>
+            {done.student.is_offline && (
+              <Button variant="secondary" onClick={() => setClaiming(true)}>
+                Give a claim code
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={() => {
@@ -161,6 +168,7 @@ export function AdmissionScreen({ initialSeatId }: { initialSeatId?: string }) {
             </Button>
           </div>
         </div>
+        {claiming && <ClaimCodeDialog studentId={done.student.id} studentName={done.student.name} onClose={() => setClaiming(false)} />}
       </Page>
     );
   }

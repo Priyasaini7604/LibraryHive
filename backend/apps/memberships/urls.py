@@ -8,6 +8,7 @@ urlpatterns = [
     path("owner/members/<uuid:membership_id>/renewals/", views.OwnerRenewalView.as_view(), name="owner-member-renew"),
     path("owner/members/<uuid:membership_id>/archive/", views.OwnerArchiveView.as_view(), name="owner-member-archive"),
     path("owner/dues/", views.OwnerDuesView.as_view(), name="owner-dues"),
+    path("owner/students/<uuid:student_id>/claim-code/", views.ClaimCodeView.as_view(), name="owner-claim-code"),
     path("owner/admissions/lookup/", views.AdmissionLookupView.as_view(), name="owner-admission-lookup"),
     path("owner/admissions/", views.AdmissionView.as_view(), name="owner-admission-create"),
     path("student/memberships/", views.StudentMembershipListView.as_view(), name="student-membership-list"),

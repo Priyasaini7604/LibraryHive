@@ -292,6 +292,23 @@ def lookup_admission_identity(*, library, phone: str, email: str | None):
     return user, selectors.student_is_member(user, library)
 
 
+# --- Owner claim code (#55, T06b) ---
+
+
+def issue_claim_code(*, library, owner, student_id):
+    """One-time claim code for a walk-in student who has (or had) a membership at this library (#55, OFF-04).
+
+    A student with no membership here is a 404, so an owner cannot probe for accounts of other libraries. The
+    account itself must still be an unclaimed offline record (else 409). The plain code is returned once.
+    """
+    membership = Membership.objects.select_related("student").filter(library=library, student_id=student_id).first()
+    if membership is None:
+        raise NotFound()
+    from apps.accounts import claims
+
+    return claims.issue_claim_code(student=membership.student, issued_by=owner)
+
+
 # --- Archival (#52) ------------------------------------------------------------------------------------------
 
 

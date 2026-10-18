@@ -58,6 +58,11 @@ export function fetchDues(query: { status?: "due" | "overdue"; bucket?: "1-7" | 
   return api.get<Page<DueRow>>("/owner/dues/", { query });
 }
 
+/** One-time claim code for a walk-in student (#55). The code is returned once and never stored. */
+export function issueClaimCode(studentId: string): Promise<{ code: string; expires_at: string }> {
+  return api.post<{ code: string; expires_at: string }>(`/owner/students/${studentId}/claim-code/`);
+}
+
 export function lookupAdmission(input: { phone: string; email?: string }): Promise<AdmissionLookup> {
   return api.post<AdmissionLookup>("/owner/admissions/lookup/", input);
 }

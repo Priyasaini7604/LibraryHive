@@ -15,3 +15,13 @@ class SeatsConfig(AppConfig):
             code="CONFLICT",
             message="A seat with this label already exists in your library.",
         )
+        register_constraint_error(
+            "seathold_one_pending_per_seat",
+            code="SEAT_UNAVAILABLE",
+            message="That seat was just taken. Please pick another.",
+        )
+        register_constraint_error(
+            "seathold_one_pending_per_student_library",
+            code="HOLD_EXISTS",
+            message="You already have a seat on hold at this library.",
+        )

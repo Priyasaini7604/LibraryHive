@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from .models import Seat
+from .models import Seat, SeatHold
 from .services import MAX_SEATS_PER_REQUEST
 
 
@@ -50,3 +50,54 @@ class OwnerSeatSerializer(serializers.ModelSerializer):
         model = Seat
         fields = ["id", "label", "row_label", "position", "is_active", "is_disabled", "disabled_reason"]
         read_only_fields = fields
+
+
+class ReasonInput(serializers.Serializer):
+    """Owner overrides always carry a reason (SEAT-07); it goes to the audit trail."""
+
+    reason = serializers.CharField(min_length=3, max_length=200, trim_whitespace=True)
+
+
+class CreateHoldInput(serializers.Serializer):
+    seat_id = serializers.UUIDField()
+    plan_id = serializers.UUIDField()
+
+
+class StudentHoldSerializer(serializers.ModelSerializer):
+    """#38-#40: what the checkout screen needs. Never exposes other students or library internals."""
+
+    seat = serializers.SerializerMethodField()
+    library = serializers.SerializerMethodField()
+    plan = serializers.SerializerMethodField()
+    amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SeatHold
+        fields = ["id", "seat", "library", "plan", "amount", "expires_at"]
+        read_only_fields = fields
+
+    def get_seat(self, hold) -> dict:
+        return {"id": str(hold.seat_id), "label": hold.seat.label}
+
+    def get_library(self, hold) -> dict:
+        return {"id": str(hold.library_id), "name": hold.library.name}
+
+    def get_plan(self, hold) -> dict:
+        plan = hold.plan
+        return {"id": str(plan.pk), "name": plan.name, "duration_days": plan.duration_days, "price": str(plan.price)}
+
+    def get_amount(self, hold) -> str:
+        # Always the plan's price from the database: the client never sends an amount.
+        return str(hold.plan.price)
+
+
+class OwnerHoldSerializer(serializers.ModelSerializer):
+    seat = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SeatHold
+        fields = ["id", "kind", "status", "seat", "reason", "expires_at", "created_at"]
+        read_only_fields = fields
+
+    def get_seat(self, hold) -> dict:
+        return {"id": str(hold.seat_id), "label": hold.seat.label}

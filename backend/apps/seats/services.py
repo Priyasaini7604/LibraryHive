@@ -1,23 +1,28 @@
 """All seat state changes (BACKEND_ARCHITECTURE.md section 8, SPEC.md 3.8).
 
 Views only parse, check permissions, call these and wrap the result.
-Removing (#33) and disabling (#34) a seat are not here yet: both must refuse a
-seat with an active membership or a live hold, which needs
-`memberships.selectors.active_membership_exists` (T11 completion) and the hold
-model (T12). They are added with those, never as an unguarded shortcut.
+Removing (#33) and disabling (#34) a seat are still not here: both must refuse a
+seat with an active membership or a live hold. The pieces now exist (T11 and T12),
+and the guard is added together with the derived seat status (T10 completion),
+never as an unguarded shortcut.
 """
 
 import logging
+import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
+from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 
 from apps.core import audit
 from apps.core.exceptions import Conflict, NotFound, ValidationFailed
 from apps.libraries import services as library_services
-from apps.libraries.models import Library
+from apps.libraries.models import Library, PricingPlan
 
-from .models import Seat
+from .models import Seat, SeatHold
 
 logger = logging.getLogger("apps.seats")
 
@@ -128,3 +133,237 @@ def enable_seat(*, library: Library, seat: Seat, actor) -> Seat:
         seat.save(update_fields=["is_disabled", "disabled_reason", "updated_at"])
         audit.record(actor=actor, action="seat.enable", entity_type="seat", entity_id=seat.pk, library=library)
     return seat
+
+
+# --- Holds (T12, BOOK-01..05, SEAT-07) ---------------------------------------------------------
+#
+# Locking order (BACKEND_ARCHITECTURE.md 8.1): Library -> Seat -> ... -> Hold. Every writer of a hold
+# locks the seat row first, so the seat is the mutex for everything that can happen to that seat.
+# Not here, by design: the pending Payment of a cancelled hold (T14), the student notification when an
+# owner releases a hold (T13 is not on this branch and SPEC.md 3.13 defines no type for it), and the
+# scheduled `expire_holds` step wiring (T24 calls `expire_dead_holds`).
+
+
+def _memberships():
+    """`memberships.selectors`, imported lazily so `seats` never imports memberships models at load time."""
+    from apps.memberships import selectors
+
+    return selectors
+
+
+def _locked_seat_by_id(seat_id, *, library: Library | None = None) -> Seat:
+    queryset = Seat.objects.select_for_update().select_related("library").filter(is_active=True)
+    if library is not None:
+        queryset = queryset.filter(library=library)
+    try:
+        return queryset.get(pk=seat_id)
+    except (Seat.DoesNotExist, ValueError, TypeError, DjangoValidationError) as exc:
+        raise NotFound() from exc
+
+
+def expire_dead_holds_for_seat(seat: Seat, *, now=None) -> int:
+    now = now or timezone.now()
+    return SeatHold.objects.filter(seat=seat, status=SeatHold.Status.PENDING, expires_at__lte=now).update(
+        status=SeatHold.Status.EXPIRED, closed_at=now, updated_at=now
+    )
+
+
+def expire_dead_holds_for_student(student, library: Library, *, now=None) -> int:
+    now = now or timezone.now()
+    return SeatHold.objects.filter(
+        student=student,
+        library=library,
+        kind=SeatHold.Kind.BOOKING,
+        status=SeatHold.Status.PENDING,
+        expires_at__lte=now,
+    ).update(status=SeatHold.Status.EXPIRED, closed_at=now, updated_at=now)
+
+
+def expire_dead_holds(*, now=None) -> int:
+    """The `expire_holds` job step: pending booking holds past `expires_at` become `expired`.
+
+    Reads never depend on it (a dead hold is already treated as free), it only tidies the table.
+    Idempotent: a row that is no longer pending is not touched.
+    """
+    now = now or timezone.now()
+    count = SeatHold.objects.filter(status=SeatHold.Status.PENDING, expires_at__lte=now).update(
+        status=SeatHold.Status.EXPIRED, closed_at=now, updated_at=now
+    )
+    if count:
+        audit.record(
+            actor=None,
+            action="hold.expired_batch",
+            entity_type="seat_hold",
+            entity_id=uuid.uuid4(),
+            changes={"expired": count},
+        )
+        logger.info("Expired dead holds", extra={"expired": count})
+    return count
+
+
+def _conflict(message: str, code: str, **context) -> Conflict:
+    logger.warning("Seat booking conflict detected", extra={"error_code": code, **context})
+    return Conflict(message, code=code)
+
+
+@transaction.atomic
+def create_booking_hold(*, student, seat_id, plan_id) -> SeatHold:
+    """Hold a seat for `SEAT_HOLD_MINUTES` for a student who is about to pay (#38, BACKEND_ARCHITECTURE.md 8.2).
+
+    The seat row lock plus `seathold_one_pending_per_seat` give exactly one winner when N students race.
+    """
+    seat = _locked_seat_by_id(seat_id)
+    library = seat.library
+    ctx = {"seat_id": str(seat.pk), "student_id": str(student.pk)}
+    if not (library.is_active and library.is_published):
+        raise _conflict("This library isn't taking bookings right now.", "LIBRARY_NOT_BOOKABLE", **ctx)
+    plan = PricingPlan.objects.filter(pk=plan_id, library=library, is_active=True).first() if plan_id else None
+    if plan is None:
+        raise _conflict("This plan is no longer available. Please choose another.", "PLAN_INACTIVE", **ctx)
+    unavailable = "That seat was just taken. Please pick another."
+    if seat.is_disabled:
+        raise _conflict(unavailable, "SEAT_UNAVAILABLE", **ctx)
+
+    now = timezone.now()
+    expire_dead_holds_for_seat(seat, now=now)
+    memberships = _memberships()
+    if memberships.active_membership_exists(seat):
+        raise _conflict(unavailable, "SEAT_UNAVAILABLE", **ctx)
+    if memberships.student_is_member(student, library):
+        raise _conflict("You already have a seat at this library.", "ALREADY_MEMBER", **ctx)
+    if SeatHold.objects.live(now).filter(seat=seat).exists():
+        raise _conflict(unavailable, "SEAT_UNAVAILABLE", **ctx)
+    expire_dead_holds_for_student(student, library, now=now)
+    if SeatHold.objects.live(now).filter(student=student, library=library, kind=SeatHold.Kind.BOOKING).exists():
+        raise _conflict("You already have a seat on hold at this library.", "HOLD_EXISTS", **ctx)
+
+    hold = SeatHold.objects.create(
+        seat=seat,
+        library=library,
+        kind=SeatHold.Kind.BOOKING,
+        student=student,
+        plan=plan,
+        created_by=student,
+        expires_at=now + timedelta(minutes=settings.SEAT_HOLD_MINUTES),
+    )
+    audit.record(
+        actor=student,
+        action="hold.create",
+        entity_type="seat_hold",
+        entity_id=hold.pk,
+        library=library,
+        changes={"seat": seat.label, "plan": plan.name},
+    )
+    logger.info("Seat hold created", extra={"hold_id": str(hold.pk), **ctx})
+    return hold
+
+
+def _own_pending_hold_for_update(*, hold: SeatHold) -> SeatHold:
+    """Lock the hold's seat first, then re-read the hold under the lock (Seat -> Hold order)."""
+    Seat.objects.select_for_update().get(pk=hold.seat_id)
+    return SeatHold.objects.select_for_update().get(pk=hold.pk)
+
+
+HOLD_NOT_ACTIVE = "This seat hold is no longer active."
+
+
+def _is_live_pending(hold: SeatHold, *, now) -> bool:
+    """True if the hold is still pending and not past its expiry. A pending hold that is already dead is
+    closed as `expired` here, so the caller must raise *after* the transaction commits or the tidy-up is lost."""
+    if hold.status == SeatHold.Status.PENDING and hold.expires_at is not None and hold.expires_at <= now:
+        hold.status = SeatHold.Status.EXPIRED
+        hold.closed_at = now
+        hold.save(update_fields=["status", "closed_at", "updated_at"])
+    return hold.status == SeatHold.Status.PENDING
+
+
+def cancel_hold(*, student, hold: SeatHold) -> SeatHold:
+    """The student abandons their own pending booking hold (#40, BOOK-04). The seat is free again at once."""
+    cancelled = _cancel_hold(student=student, hold=hold)
+    if cancelled is None:
+        raise Conflict(HOLD_NOT_ACTIVE, code="HOLD_EXPIRED")
+    return cancelled
+
+
+@transaction.atomic
+def _cancel_hold(*, student, hold: SeatHold) -> SeatHold | None:
+    now = timezone.now()
+    hold = _own_pending_hold_for_update(hold=hold)
+    if hold.student_id != student.pk or hold.kind != SeatHold.Kind.BOOKING:
+        raise NotFound()
+    if not _is_live_pending(hold, now=now):
+        return None
+    hold.status = SeatHold.Status.CANCELLED
+    hold.closed_at = now
+    hold.save(update_fields=["status", "closed_at", "updated_at"])
+    audit.record(actor=student, action="hold.cancel", entity_type="seat_hold", entity_id=hold.pk, library=hold.library)
+    logger.info("Seat hold cancelled", extra={"hold_id": str(hold.pk), "student_id": str(student.pk)})
+    return hold
+
+
+@transaction.atomic
+def place_manual_hold(*, library: Library, seat_id, actor, reason: str) -> SeatHold:
+    """Block a free seat of the owner's library for an offline or physical reason (#36, SEAT-07). No expiry."""
+    seat = _locked_seat_by_id(seat_id, library=library)
+    now = timezone.now()
+    expire_dead_holds_for_seat(seat, now=now)
+    if (
+        seat.is_disabled
+        or _memberships().active_membership_exists(seat)
+        or SeatHold.objects.live(now).filter(seat=seat).exists()
+    ):
+        raise _conflict("This seat is not free.", "SEAT_UNAVAILABLE", seat_id=str(seat.pk), actor_id=str(actor.pk))
+    hold = SeatHold.objects.create(
+        seat=seat,
+        library=library,
+        kind=SeatHold.Kind.OWNER_MANUAL,
+        reason=reason.strip(),
+        created_by=actor,
+    )
+    audit.record(
+        actor=actor,
+        action="hold.manual_place",
+        entity_type="seat_hold",
+        entity_id=hold.pk,
+        library=library,
+        changes={"seat": seat.label},
+        reason=hold.reason,
+    )
+    logger.info("Manual seat hold placed", extra={"hold_id": str(hold.pk), "seat_id": str(seat.pk)})
+    return hold
+
+
+def release_hold(*, library: Library, hold: SeatHold, actor, reason: str) -> SeatHold:
+    """The owner frees any pending hold of their library, a stuck student hold or a manual one (#37, SEAT-07).
+
+    Only a pending hold can be released. A paid membership is never touched: payment completes a hold
+    into a membership, and a completed hold is no longer pending.
+    """
+    released = _release_hold(library=library, hold=hold, actor=actor, reason=reason)
+    if released is None:
+        raise Conflict(HOLD_NOT_ACTIVE, code="HOLD_EXPIRED")
+    return released
+
+
+@transaction.atomic
+def _release_hold(*, library: Library, hold: SeatHold, actor, reason: str) -> SeatHold | None:
+    now = timezone.now()
+    hold = _own_pending_hold_for_update(hold=hold)
+    if hold.library_id != library.pk:
+        raise NotFound()
+    if not _is_live_pending(hold, now=now):
+        return None
+    hold.status = SeatHold.Status.RELEASED
+    hold.closed_at = now
+    hold.save(update_fields=["status", "closed_at", "updated_at"])
+    audit.record(
+        actor=actor,
+        action="hold.release",
+        entity_type="seat_hold",
+        entity_id=hold.pk,
+        library=library,
+        changes={"kind": hold.kind},
+        reason=reason.strip(),
+    )
+    logger.info("Seat hold released", extra={"hold_id": str(hold.pk), "actor_id": str(actor.pk)})
+    return hold

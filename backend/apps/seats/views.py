@@ -1,22 +1,31 @@
-"""Owner seat manager endpoints #30-#32 and #35.
+"""Owner seat manager endpoints #30-#32, #35-#37 and the student booking-hold endpoints #38-#40.
 
 Not here yet, by design: #16 (public seat map) and the status, occupant, hold
 and counts fields of #30 need the derived seat status (SPEC.md 4.1); #33 and #34
-need its in-use guard; #36 is T12. See IMPLEMENTATION_PLAN.md T10.
+need its in-use guard. See IMPLEMENTATION_PLAN.md T10.
 """
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.core.mixins import OwnerLibraryScopedMixin
-from apps.core.permissions import HasLibrary, IsOwner
+from apps.core.mixins import OwnerLibraryScopedMixin, StudentOwnedScopedMixin
+from apps.core.permissions import HasLibrary, IsOwner, IsStudent
 from apps.core.responses import created, ok
 
 from . import selectors, services
-from .models import Seat
-from .serializers import OwnerSeatSerializer, SeatCreateInput, SeatUpdateInput
+from .models import Seat, SeatHold
+from .serializers import (
+    CreateHoldInput,
+    OwnerHoldSerializer,
+    OwnerSeatSerializer,
+    ReasonInput,
+    SeatCreateInput,
+    SeatUpdateInput,
+    StudentHoldSerializer,
+)
 
 
 class _OwnerSeatView(OwnerLibraryScopedMixin, APIView):
@@ -79,3 +88,74 @@ class OwnerSeatEnableView(_OwnerSeatView):
         seat = self.get_scoped_object(pk=seat_id)
         seat = services.enable_seat(library=request.user.library, seat=seat, actor=request.user)
         return ok(OwnerSeatSerializer(seat).data)
+
+
+class OwnerManualHoldView(_OwnerSeatView):
+    """#36 block a free seat for an offline or physical reason."""
+
+    @extend_schema(request=ReasonInput, responses={201: OwnerHoldSerializer})
+    def post(self, request, seat_id):
+        data = ReasonInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        hold = services.place_manual_hold(
+            library=request.user.library, seat_id=seat_id, actor=request.user, reason=data.validated_data["reason"]
+        )
+        return created(OwnerHoldSerializer(hold).data)
+
+
+class OwnerHoldReleaseView(OwnerLibraryScopedMixin, APIView):
+    """#37 release any pending hold of the owner's library."""
+
+    permission_classes = [IsAuthenticated, IsOwner, HasLibrary]
+    parser_classes = [JSONParser]
+    model = SeatHold
+
+    @extend_schema(request=ReasonInput, responses={200: OwnerHoldSerializer})
+    def post(self, request, hold_id):
+        hold = self.get_scoped_object(pk=hold_id)
+        data = ReasonInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        hold = services.release_hold(
+            library=request.user.library, hold=hold, actor=request.user, reason=data.validated_data["reason"]
+        )
+        return ok(OwnerHoldSerializer(hold).data)
+
+
+class _StudentHoldView(StudentOwnedScopedMixin, APIView):
+    permission_classes = [IsAuthenticated, IsStudent]
+    parser_classes = [JSONParser]
+    model = SeatHold
+
+
+class StudentHoldCreateView(_StudentHoldView):
+    """#38 start a booking: hold the seat for the configured window."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "hold_create"
+
+    @extend_schema(request=CreateHoldInput, responses={201: StudentHoldSerializer})
+    def post(self, request):
+        data = CreateHoldInput(data=request.data)
+        data.is_valid(raise_exception=True)
+        hold = services.create_booking_hold(
+            student=request.user, seat_id=data.validated_data["seat_id"], plan_id=data.validated_data["plan_id"]
+        )
+        return created(StudentHoldSerializer(hold).data)
+
+
+class StudentCurrentHoldsView(_StudentHoldView):
+    """#39 resume an in-progress booking after a page reload (live holds only)."""
+
+    @extend_schema(responses={200: StudentHoldSerializer(many=True)})
+    def get(self, request):
+        return ok(StudentHoldSerializer(selectors.current_booking_holds(request.user), many=True).data)
+
+
+class StudentHoldCancelView(_StudentHoldView):
+    """#40 abandon a booking."""
+
+    @extend_schema(request=None, responses={200: StudentHoldSerializer})
+    def post(self, request, hold_id):
+        hold = self.get_scoped_object(pk=hold_id)
+        hold = services.cancel_hold(student=request.user, hold=hold)
+        return ok(StudentHoldSerializer(hold).data)

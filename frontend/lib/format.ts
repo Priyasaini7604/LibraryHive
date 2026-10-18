@@ -66,3 +66,12 @@ export function formatPhone(e164: string): string {
   const match = /^\+91(\d{5})(\d{5})$/.exec(e164);
   return match ? `+91 ${match[1]} ${match[2]}` : e164;
 }
+
+/** "06:00:00" or "06:00" -> "6:00 am"; empty or invalid input gives "". */
+export function formatTime(time: string | null | undefined): string {
+  const match = /^(\d{1,2}):(\d{2})/.exec(time ?? "");
+  if (!match) return "";
+  const hours = Number(match[1]);
+  const suffix = hours >= 12 ? "pm" : "am";
+  return `${hours % 12 || 12}:${match[2]} ${suffix}`;
+}

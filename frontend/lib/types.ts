@@ -57,3 +57,121 @@ export interface LoginResponse extends AccessTokenResponse {
 export interface MessageResponse {
   message: string;
 }
+
+/** Libraries, plans and photos (BACKEND_ARCHITECTURE.md #14, #15, #17-#29). */
+
+export interface PricingPlan {
+  id: string;
+  name: string;
+  duration_days: number;
+  /** Decimal string such as "1200.00"; format it with formatMoney. */
+  price: string;
+  timing_note: string;
+}
+
+export interface OwnerPlan extends PricingPlan {
+  is_active: boolean;
+  /** True once a membership, payment or hold references the plan (it can only be deactivated). */
+  in_use: boolean;
+}
+
+export interface PublicPhoto {
+  id: string;
+  url: string;
+  thumb_url: string;
+  caption: string;
+  is_cover: boolean;
+}
+
+export interface OwnerPhoto extends PublicPhoto {
+  display_order: number;
+  width: number;
+  height: number;
+}
+
+/** Present only once the seat inventory exists (T10); never invented by the client. */
+export interface SeatCounts {
+  total: number;
+  empty: number;
+  reserved: number;
+  occupied: number;
+}
+
+/** One card of the discovery list (#14). */
+export interface LibrarySummary {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  cover?: { thumb_url: string };
+  amenities: string[];
+  domains: string[];
+  starting_price: string | null;
+  seat_counts?: SeatCounts;
+  distance_km?: number;
+}
+
+/** The public explore page (#15). */
+export interface LibraryDetail {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  city: string;
+  area: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
+  operating_notes: string;
+  amenities: Vocabulary[];
+  domains: Vocabulary[];
+  plans: PricingPlan[];
+  photos: PublicPhoto[];
+  seat_counts?: SeatCounts;
+}
+
+export interface PublishChecklist {
+  has_profile: boolean;
+  has_location: boolean;
+  has_active_plan: boolean;
+  has_active_seat: boolean;
+}
+
+/** The owner's own library (#17-#19). */
+export interface OwnerLibrary {
+  id: string;
+  name: string;
+  description: string;
+  address: string;
+  city: string;
+  area: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  opens_at: string | null;
+  closes_at: string | null;
+  operating_notes: string;
+  domains: Vocabulary[];
+  amenities: Vocabulary[];
+  is_published: boolean;
+  is_active: boolean;
+  publish_checklist: PublishChecklist;
+}
+
+export type LibrarySort = "distance" | "price" | "available";
+
+export interface LibraryFilters {
+  search?: string;
+  domain?: string;
+  amenity?: string[];
+  lat?: number;
+  lng?: number;
+  radius_km?: number;
+  sort?: LibrarySort;
+  page?: number;
+  page_size?: number;
+}

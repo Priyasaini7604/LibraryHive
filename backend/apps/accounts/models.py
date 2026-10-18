@@ -112,8 +112,7 @@ class AccountClaim(BaseModel):
     `owner_code` for claiming an offline account (OFF-04). The plain code is
     never stored; only a hash made with Django's password hasher.
 
-    The `library` column (owner codes are issued by an owner for their
-    library) is added together with the Library model in T08.
+    `library` is the library of the issuing owner (owner codes only).
     """
 
     class Channel(models.TextChoices):
@@ -133,6 +132,7 @@ class AccountClaim(BaseModel):
     issued_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
+    library = models.ForeignKey("libraries.Library", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     expires_at = models.DateTimeField()
     attempts = models.PositiveSmallIntegerField(default=0)

@@ -57,8 +57,9 @@ class AuditLog(BaseModel):
     """Append-only business audit trail (SPEC.md 3.4, FEATURES LOG-06).
 
     Write through `apps.core.audit.record()` inside the same transaction as the
-    change being audited. The `library` scope column is added together with
-    the Library model (task T08).
+    change being audited. `library` scopes a row to one tenant so an owner can
+    read only their own library's trail (LOG-07); it is empty for actions that
+    belong to no library (for example account events).
     """
 
     class ActorRole(models.TextChoices):
@@ -74,6 +75,7 @@ class AuditLog(BaseModel):
         blank=True,
         related_name="+",
     )
+    library = models.ForeignKey("libraries.Library", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     actor_role = models.CharField(max_length=10, choices=ActorRole.choices)
     action = models.CharField(max_length=60)
     entity_type = models.CharField(max_length=40)
@@ -90,6 +92,7 @@ class AuditLog(BaseModel):
         indexes = [
             models.Index(fields=["entity_type", "entity_id"], name="auditlog_entity_idx"),
             models.Index(fields=["actor", "-created_at"], name="auditlog_actor_idx"),
+            models.Index(fields=["library", "-created_at"], name="auditlog_library_idx"),
         ]
         constraints = [
             models.CheckConstraint(

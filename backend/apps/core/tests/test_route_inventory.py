@@ -14,6 +14,8 @@ PUBLIC_ENDPOINTS = {
     "health",
     "meta-domains",
     "meta-amenities",
+    "library-list",
+    "library-detail",
     "schema",  # public only when settings.SCHEMA_PUBLIC (non-production); see test_platform_views
     # Auth endpoints (SECURITY.md section 5); cookie endpoints also require the frontend Origin.
     "auth-register",

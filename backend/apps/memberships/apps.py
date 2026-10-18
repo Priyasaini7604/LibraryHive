@@ -15,3 +15,8 @@ class MembershipsConfig(AppConfig):
             code="ALREADY_MEMBER",
             message="You already have a seat at this library.",
         )
+        register_constraint_error(
+            "membership_one_live_per_seat",
+            code="SEAT_UNAVAILABLE",
+            message="That seat was just taken. Please pick another.",
+        )

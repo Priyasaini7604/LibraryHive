@@ -39,6 +39,15 @@ def annotate_status(queryset: QuerySet[Membership], *, today: date | None = None
     )
 
 
+def active_membership_exists(seat) -> bool:
+    """True if the seat has a non-archived membership: it is *occupied* (SPEC.md 4.1 rule 2).
+
+    Called by `seats` (imported lazily there, so `seats` never imports memberships models) and by
+    every writer of seat availability inside its seat lock.
+    """
+    return Membership.objects.filter(seat=seat, state=Membership.State.ACTIVE).exists()
+
+
 def student_is_member(student, library) -> bool:
     """True if the student holds a non-archived membership at the library (ALREADY_MEMBER check)."""
     return Membership.objects.filter(student=student, library=library, state=Membership.State.ACTIVE).exists()

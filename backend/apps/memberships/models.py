@@ -13,9 +13,9 @@ class Membership(BaseModel):
     `memberships.selectors.annotate_status` (decision D5), so it never depends
     on a job having run. Memberships are never deleted.
 
-    The `seat` foreign key (one occupant per seat, `membership_one_live_per_seat`)
-    is added in a follow-up migration as soon as the `seats.Seat` model exists
-    (T10); see IMPLEMENTATION_PLAN.md T11.
+    The seat is kept after archival as the seat history: occupancy is decided
+    by `state`, never by clearing the foreign key. With full-day seats (D1)
+    `membership_one_live_per_seat` means one occupant per seat.
     """
 
     class Source(models.TextChoices):
@@ -28,6 +28,7 @@ class Membership(BaseModel):
 
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="memberships")
     library = models.ForeignKey("libraries.Library", on_delete=models.PROTECT, related_name="memberships")
+    seat = models.ForeignKey("seats.Seat", on_delete=models.PROTECT, related_name="memberships")
     plan = models.ForeignKey("libraries.PricingPlan", on_delete=models.PROTECT, related_name="memberships")
     source = models.CharField(max_length=10, choices=Source.choices)
     state = models.CharField(max_length=10, choices=State.choices, default=State.ACTIVE)
@@ -50,6 +51,11 @@ class Membership(BaseModel):
                 fields=["student", "library"],
                 condition=Q(state="active"),
                 name="membership_one_live_per_student_library",
+            ),
+            models.UniqueConstraint(
+                fields=["seat"],
+                condition=Q(state="active"),
+                name="membership_one_live_per_seat",
             ),
             models.CheckConstraint(
                 condition=~Q(state="archived") | Q(archived_at__isnull=False),

@@ -2,6 +2,7 @@
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from itertools import count
 from unittest import mock
 
 from django.db import IntegrityError, transaction
@@ -14,17 +15,23 @@ from apps.core.tests.factories import make_owner, make_student
 from apps.libraries.tests.base import make_library, make_plan
 from apps.memberships import selectors
 from apps.memberships.models import Membership
+from apps.seats.models import Seat
 
 TODAY = date(2026, 10, 18)
+_seat_numbers = count(1)
 
 
-def make_membership(*, library=None, plan=None, student=None, today=TODAY, due_in=30, **overrides) -> Membership:
+def make_membership(
+    *, library=None, plan=None, student=None, seat=None, today=TODAY, due_in=30, **overrides
+) -> Membership:
     library = library or make_library(make_owner())
+    seat = seat or Seat.objects.create(library=library, label=f"T{next(_seat_numbers)}")
     plan = plan or make_plan(library)
     student = student or make_student()
     values = {
         "student": student,
         "library": library,
+        "seat": seat,
         "plan": plan,
         "source": Membership.Source.ONLINE,
         "state": Membership.State.ACTIVE,

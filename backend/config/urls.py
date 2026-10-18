@@ -10,6 +10,7 @@ api_v1 = [
     path("auth/", include("apps.accounts.urls")),
     path("", include("apps.libraries.urls")),
     path("", include("apps.seats.urls")),
+    path("notifications/", include("apps.notifications.urls")),
 ]
 
 urlpatterns = [

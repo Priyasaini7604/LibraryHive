@@ -135,16 +135,15 @@ Branch names follow `AGENTS.md` §10: **`feature/<task-name>`** (one short-lived
 ## Status checklist (2026-10-19)
 
 State of every task on the working branch `integration/payments-base`. "Done" means the task's backend and
-frontend scope is built and its tests pass; **nothing after T14 is committed yet** (T15 onward is in the working
-tree for review). Checks were run on 2026-10-19: backend 636 tests, frontend 208 tests, lint, type check and
+frontend scope is built and its tests pass; T15 to T26 are committed locally (not pushed). Checks were run on 2026-10-19: backend 698 tests, frontend 266 tests, lint, type check and
 `next build` all pass; OpenAPI validates with no warnings.
 
 | Task | State | Notes |
 |---|---|---|
 | T00-T05 | Done on `main` | Foundation, CI, frontend foundation, accounts, password reset |
-| T06 account claim | **On `origin/main` only**, not on this branch | Needs `main` merged here (not authorised yet) |
-| T06b claim-code endpoint (#55) | **Blocked** by T06 | Depends on the `AccountClaim` claim code from T06 |
-| T07 auth and profile screens | **On `feature/auth-ui` only**, not on this branch | Login, register, reset, claim and profile screens live there |
+| T06 account claim | Done, merged here from `origin/main` (local merge commit) | |
+| T06b claim-code endpoint (#55) | Done | `issue_claim_code` wrapper plus the owner dialog; a test claims a walk-in account end to end |
+| T07 auth and profile screens | Done, merged here from `feature/auth-ui` (local merge commit) | Login, register, reset, claim and profile screens |
 | T08, T09 libraries, photos | Done | |
 | T10 seats | Done | Seat status derived, never stored |
 | T11 membership model | Done | |
@@ -155,23 +154,34 @@ tree for review). Checks were run on 2026-10-19: backend 636 tests, frontend 208
 | T16 public screens and seat map | Done except the map/geocoding extras | Seat map and booking panel built; `LibraryMap`, `LocationPicker`, `lib/geocode.ts` not built (Leaflet not installed; geocoding needs decision U2) |
 | T17 owner onboarding, settings, seat manager | Done | Onboarding is five steps (profile, plans, photos, seats, live) |
 | T18 checkout and renewal | Done | Automated against a mocked payment window; manual Razorpay staging check **pending** |
-| T19 membership, admission, dues, payments screens | Done except claim-code display | Claim code needs T06b |
+| T19 membership, admission, dues, payments screens | Done | Claim code is shown once from the admission result and from the member page |
 | T20 attendance | Done | Includes auto-close and closing the open record on archival |
 | T21 complaints | Done except the photo (CMP-06, P1) | Photo needs private object storage |
 | T22 visits | Done | Backend and screens |
 | T23 analytics, dashboards, exports | Done | `domain_breakdown` on the public #15 is **not** added (owner dashboard has it) |
 | T24 scheduled jobs and email | Done | `run_scheduled_jobs`, fallback trigger #4 |
 | T25 operations screens | Done | |
-| T26 integration | Partly | `seed_demo` and an end-to-end API journey test done; Playwright suite and the SECURITY section 20 checklist run are **not** done |
+| T26 integration | Partly | `seed_demo`, an end-to-end API journey test, a role matrix over every route and a live smoke run through the frontend proxy are done; Playwright suite and a full SECURITY section 20 run are **not** done |
 
 ### Open decisions and external blockers
 
 1. **Owner-release notification (T12).** SPEC 3.13 lists no notification type and SPEC 4.5 no dedup key for it. Not implemented, nothing invented. Needs a SPEC-backed type name, recipient and key.
 2. **Archive notification (T15, #52 says the student is notified).** Same gap in SPEC 3.13 / 4.5. The archive itself, the audit entry and the closing of an open attendance record are done; the notification is not sent.
-3. **Real Razorpay test-mode payment (T14, T18).** `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are not set in `backend/.env`. Every automated check uses the fake gateway; none of them proves the real integration. Procedure: set the three values in `backend/.env`, expose `/api/v1/payments/webhook/razorpay/` (for example with a tunnel), subscribe the Razorpay test webhook to `payment.captured`, `order.paid` and `payment.failed`, then pay one order with a test card and one with UPI, a failed card, and a dismissed window.
-4. **T06, T06b, T07 are not on this branch.** They exist on `origin/main` and `feature/auth-ui`. The login, register, reset, claim and profile screens, and the owner claim-code endpoint, need them. Merging is a decision for the project lead.
+3. **Real Razorpay test-mode payment (T14, T18): partly verified.** Keys are configured. `python manage.py check_razorpay` ran against Razorpay's real API on 2026-10-19: valid test keys, a real 1-rupee order created and read back, and our signature code agreeing with the configured secrets. Our own `create_order` path was also run once against the real API (a real order, a forged checkout refused, nothing captured). **Still not verified:** paying in the real checkout window, and Razorpay delivering a webhook. Original note: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are not set in `backend/.env`. Every automated check uses the fake gateway; none of them proves the real integration. Procedure: set the three values in `backend/.env`, expose `/api/v1/payments/webhook/razorpay/` (for example with a tunnel), subscribe the Razorpay test webhook to `payment.captured`, `order.paid` and `payment.failed`, then pay one order with a test card and one with UPI, a failed card, and a dismissed window.
+4. **T06 and T07 were merged into this branch locally** (2026-10-19, with the project lead's authorisation). Nothing is pushed; the pull requests for T06 and T07 are separate.
 5. **Complaint photo (CMP-06, P1)** needs private object storage; not built.
-6. **Playwright end-to-end suite and the SECURITY section 20 checklist** (T26) are not done.
+6. **Playwright end-to-end suite and the SECURITY section 20 checklist** (T26) are not done (the role matrix, journey and logging checks are).
+
+### Manual Razorpay test-mode check (what is left)
+
+Needs a person with a browser and a public URL; neither can be done from the repository alone.
+
+1. `python manage.py check_razorpay` must pass first (it needs only the keys in `backend/.env`).
+2. Expose the backend publicly, for example with a tunnel to port 8000, and note the HTTPS address.
+3. In the Razorpay dashboard (test mode), add a webhook to `https://<address>/api/v1/payments/webhook/razorpay/` with the same secret as `RAZORPAY_WEBHOOK_SECRET`, subscribed to `payment.captured`, `order.paid` and `payment.failed`.
+4. Add the tunnel address to `ALLOWED_HOSTS` in `backend/.env`; run `seed_demo`, start both servers, sign in as the demo student and book a seat.
+5. Pay with: a successful test card, a failing test card, UPI success, and close the window without paying. Expect: exactly one membership for the successful ones, a clear message for the failure and the dismissal, and a receipt.
+6. Confirm in the owner's Payments page that each attempt appears once with the right status, and in the Razorpay dashboard that the webhook deliveries returned 200.
 
 ### Stage 0 — Foundation
 
@@ -370,7 +380,7 @@ The application code from before the approved design is **retired, not reconcile
 - **Frontend:** `student/memberships/`, `student/payments/` (+ printable receipt), `owner/members/` (+ detail with archive and record-renewal dialogs), `owner/members/new` (admission with identity lookup and claim-code display), `owner/dues/`, `owner/payments/`; `lib/api/memberships.ts`.
 - **Dependencies:** T06b, T15, T17 (seat picker), T03.
 - **Tests:** admission identity states (none, existing, conflict); claim code shown once; archive confirmation; tables collapse to cards on mobile; Playwright: owner admits an offline student with cash.
-- **Implementation notes (2026-10-19):** student `memberships` (list, detail with period history), `payments` and a printable receipt; owner `members` (search, status and source filters, CSV export), member detail (renew and archive dialogs, attendance summary and complaint count), `members/new` (identity check showing masked contact details, seat and plan, payment received, no amount field), `dues` (record a payment from the row; the row carries the plan id so paying never changes the member's plan) and `payments` (ledger, filters, detail, export). **Not done:** showing the owner claim code (needs T06b).
+- **Implementation notes (2026-10-19):** student `memberships` (list, detail with period history), `payments` and a printable receipt; owner `members` (search, status and source filters, CSV export), member detail (renew and archive dialogs, attendance summary and complaint count), `members/new` (identity check showing masked contact details, seat and plan, payment received, no amount field), `dues` (record a payment from the row; the row carries the plan id so paying never changes the member's plan) and `payments` (ledger, filters, detail, export). The owner claim code (T06b, #55) is created on request from the admission result and the member page, shown once, and never stored.
 
 #### T25 Operations screens · P4 · L · `feature/operations-ui`
 - **Frontend:** `student/page.tsx` (dashboard), `owner/page.tsx` (dashboard), `student/attendance/`, `owner/attendance/`, `student/complaints/*`, `owner/complaints/*`, `student|owner/notifications/`, `owner/reports/`, `owner/activity/` (P1), `components/charts/*` (StatCard, OccupancyBar, DomainBars), `components/attendance/*`, `components/notifications/*` (bell in both shells, via a PR to P1's shells).
@@ -463,3 +473,9 @@ A task is done only when **all** of these hold (AGENTS §12, FEATURES §1):
 | — | Email provider credentials | **Recorded 2026-10-09:** provided before staging email-flow testing. Local development uses the console email backend. Not a blocker for T00/T01. |
 | **D19** | Implementation strategy | **DECIDED 2026-10-09:** fresh implementation from the approved design; legacy code retired and preserved in `legacy/*` tags (T00, §5). Supersedes G1 and G2 (no reconciliation of legacy code). |
 - **Progress (2026-10-19):** `python manage.py seed_demo` (local only; refuses in production and without DEBUG unless `--force`; idempotent) creates a demo owner and library, six students with different due dates, payments, attendance, a complaint and a visit through the services. `apps/core/tests/test_e2e_journey.py` drives one full journey through the real API with registered and logged-in users (setup, booking, signed payment event, check-in, complaint, visit, admission, renewal, notifications, reports, export, isolation, archival). **Not done:** Playwright, the isolation matrix in every app, and the SECURITY section 20 run.
+
+### Fixes found while integrating (2026-10-19)
+
+- **Reserved logging key.** `logger.info(..., extra={"created": ...})` raises `KeyError` because `created` is a `LogRecord` field. It sat in `notify()`, seat creation and the renewal job, so with INFO logging on (local, production) adding seats and sending any notification would have failed. Tests did not see it because every logger was silenced. Fixed; the test settings now build INFO records for the app loggers, and `apps/core/tests/test_logging_extra.py` scans for the mistake.
+- **OpenAPI.** The claim and payment `channel` enums collided after T06 was merged; both names are pinned in `ENUM_NAME_OVERRIDES`.
+- **Plan encoding.** T06's stray Latin-1 byte in this file was repaired during the merge.

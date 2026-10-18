@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 
+import { BookingPanel } from "@/components/library/booking-panel";
+import { RequestVisitButton } from "@/components/visits/request-visit-dialog";
 import { PhotoGallery } from "@/components/library/photo-gallery";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
@@ -122,6 +124,9 @@ export function LibraryPage({ id }: { id: string }) {
           </ul>
         )}
         {library.description && <p className="max-w-3xl whitespace-pre-line text-slate-700">{library.description}</p>}
+        <div>
+          <RequestVisitButton libraryId={library.id} libraryName={library.name} />
+        </div>
       </header>
 
       {counts && (
@@ -129,9 +134,7 @@ export function LibraryPage({ id }: { id: string }) {
           <h2 id="seats-heading" className="mb-2 text-lg font-semibold text-slate-900">
             Seats
           </h2>
-          <p className="text-slate-700">
-            {counts.empty} free · {counts.reserved} reserved · {counts.occupied} occupied · {counts.total} in total
-          </p>
+          <BookingPanel libraryId={library.id} plans={library.plans} />
         </section>
       )}
 

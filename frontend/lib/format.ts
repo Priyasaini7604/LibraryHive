@@ -75,3 +75,25 @@ export function formatTime(time: string | null | undefined): string {
   const suffix = hours >= 12 ? "pm" : "am";
   return `${hours % 12 || 12}:${match[2]} ${suffix}`;
 }
+
+/** Today's business date "YYYY-MM-DD" in IST, from the given time (default: now). */
+export function businessDate(at: number = Date.now()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+  return parts; // en-CA formats as YYYY-MM-DD
+}
+
+/** Add days to a business date "YYYY-MM-DD" and return the new "YYYY-MM-DD". */
+export function addDays(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, (day ?? 1) + days, 12));
+  return date.toISOString().slice(0, 10);
+}
+
+/** "125" -> "2 h 5 min"; used for attendance durations. */
+export function formatDuration(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return "—";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}

@@ -18,12 +18,18 @@ const mocks = vi.hoisted(() => ({
   fetchLibrary: vi.fn(),
   fetchDomains: vi.fn(),
   fetchAmenities: vi.fn(),
+  fetchPublicSeats: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mocks.replace }),
   usePathname: () => "/discover",
   useSearchParams: () => mocks.search,
+}));
+vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({ status: "anonymous", user: null }) }));
+vi.mock("@/lib/api/seats", async (original) => ({
+  ...(await original<typeof import("@/lib/api/seats")>()),
+  fetchPublicSeats: mocks.fetchPublicSeats,
 }));
 vi.mock("@/lib/api/libraries", async (original) => ({
   ...(await original<typeof import("@/lib/api/libraries")>()),
@@ -240,10 +246,20 @@ describe("LibraryPage", () => {
     await expectNoAxeViolations(container);
   });
 
-  it("shows seat counts only when the API provides them", async () => {
-    mocks.fetchLibrary.mockResolvedValue({ ...detail, seat_counts: { total: 20, empty: 8, reserved: 2, occupied: 10 } });
+  it("shows the live seat map only when the library has seats", async () => {
+    mocks.fetchLibrary.mockResolvedValue({ ...detail, seat_counts: { total: 3, empty: 1, reserved: 1, occupied: 1 } });
+    mocks.fetchPublicSeats.mockResolvedValue({
+      seats: [
+        { id: "s1", label: "A-1", row_label: "A", position: 1, status: "empty" },
+        { id: "s2", label: "A-2", row_label: "A", position: 2, status: "reserved" },
+        { id: "s3", label: "A-3", row_label: "A", position: 3, status: "occupied" },
+      ],
+      counts: { total: 3, empty: 1, reserved: 1, occupied: 1 },
+    });
     renderWithClient(<LibraryPage id="l1" />);
-    expect(await screen.findByText(/8 free · 2 reserved · 10 occupied · 20 in total/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 free · 1 reserved · 1 taken · 3 in total/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seat A-1, free" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seat A-3, taken" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("explains an unavailable library on 404 instead of a generic error", async () => {

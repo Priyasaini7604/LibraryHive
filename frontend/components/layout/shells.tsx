@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -181,7 +182,10 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
               <NavLink key={item.href} item={item} active={item.href === active} />
             ))}
           </nav>
-          <UserMenu extraItems={STUDENT_MENU} />
+          <div className="flex items-center gap-1">
+            <NotificationBell href="/student/notifications" />
+            <UserMenu extraItems={STUDENT_MENU} />
+          </div>
         </div>
       </header>
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 sm:px-6 lg:pb-10">
@@ -216,7 +220,10 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
             <Logo />
           </div>
           <div className="flex-1" />
-          <UserMenu />
+          <div className="flex items-center gap-1">
+            <NotificationBell href="/owner/notifications" />
+            <UserMenu />
+          </div>
         </header>
         <main id="main" className="w-full flex-1 px-4 pb-24 pt-6 sm:px-6 lg:pb-10">
           {children}

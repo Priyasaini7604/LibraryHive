@@ -132,6 +132,47 @@ flowchart LR
 
 Branch names follow `AGENTS.md` §10: **`feature/<task-name>`** (one short-lived branch per task, from the latest `main`, deleted after merge), `fix/<issue>` for fixes, `docs/<doc>` for documentation, `chore/<topic>` for repository maintenance. Every task's tests run against **PostgreSQL**.
 
+## Status checklist (2026-10-19)
+
+State of every task on the working branch `integration/payments-base`. "Done" means the task's backend and
+frontend scope is built and its tests pass; **nothing after T14 is committed yet** (T15 onward is in the working
+tree for review). Checks were run on 2026-10-19: backend 636 tests, frontend 208 tests, lint, type check and
+`next build` all pass; OpenAPI validates with no warnings.
+
+| Task | State | Notes |
+|---|---|---|
+| T00-T05 | Done on `main` | Foundation, CI, frontend foundation, accounts, password reset |
+| T06 account claim | **On `origin/main` only**, not on this branch | Needs `main` merged here (not authorised yet) |
+| T06b claim-code endpoint (#55) | **Blocked** by T06 | Depends on the `AccountClaim` claim code from T06 |
+| T07 auth and profile screens | **On `feature/auth-ui` only**, not on this branch | Login, register, reset, claim and profile screens live there |
+| T08, T09 libraries, photos | Done | |
+| T10 seats | Done | Seat status derived, never stored |
+| T11 membership model | Done | |
+| T12 seat holds | Done | Owner-release notification is a **pending decision** (below) |
+| T13 notifications engine | Done | |
+| T14 payments | Done, committed (`c5a476c`) | Real Razorpay test payment is **pending credentials** (below) |
+| T15 admission, renewal, archival | Done, uncommitted | Archive notification is a **pending decision** |
+| T16 public screens and seat map | Done except the map/geocoding extras | Seat map and booking panel built; `LibraryMap`, `LocationPicker`, `lib/geocode.ts` not built (Leaflet not installed; geocoding needs decision U2) |
+| T17 owner onboarding, settings, seat manager | Done | Onboarding is five steps (profile, plans, photos, seats, live) |
+| T18 checkout and renewal | Done | Automated against a mocked payment window; manual Razorpay staging check **pending** |
+| T19 membership, admission, dues, payments screens | Done except claim-code display | Claim code needs T06b |
+| T20 attendance | Done | Includes auto-close and closing the open record on archival |
+| T21 complaints | Done except the photo (CMP-06, P1) | Photo needs private object storage |
+| T22 visits | Done | Backend and screens |
+| T23 analytics, dashboards, exports | Done | `domain_breakdown` on the public #15 is **not** added (owner dashboard has it) |
+| T24 scheduled jobs and email | Done | `run_scheduled_jobs`, fallback trigger #4 |
+| T25 operations screens | Done | |
+| T26 integration | Partly | `seed_demo` and an end-to-end API journey test done; Playwright suite and the SECURITY section 20 checklist run are **not** done |
+
+### Open decisions and external blockers
+
+1. **Owner-release notification (T12).** SPEC 3.13 lists no notification type and SPEC 4.5 no dedup key for it. Not implemented, nothing invented. Needs a SPEC-backed type name, recipient and key.
+2. **Archive notification (T15, #52 says the student is notified).** Same gap in SPEC 3.13 / 4.5. The archive itself, the audit entry and the closing of an open attendance record are done; the notification is not sent.
+3. **Real Razorpay test-mode payment (T14, T18).** `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are not set in `backend/.env`. Every automated check uses the fake gateway; none of them proves the real integration. Procedure: set the three values in `backend/.env`, expose `/api/v1/payments/webhook/razorpay/` (for example with a tunnel), subscribe the Razorpay test webhook to `payment.captured`, `order.paid` and `payment.failed`, then pay one order with a test card and one with UPI, a failed card, and a dismissed window.
+4. **T06, T06b, T07 are not on this branch.** They exist on `origin/main` and `feature/auth-ui`. The login, register, reset, claim and profile screens, and the owner claim-code endpoint, need them. Merging is a decision for the project lead.
+5. **Complaint photo (CMP-06, P1)** needs private object storage; not built.
+6. **Playwright end-to-end suite and the SECURITY section 20 checklist** (T26) are not done.
+
 ### Stage 0 — Foundation
 
 #### T00 Legacy cleanup and repository reset · P1 · S · `chore/legacy-cleanup` (revised 2026-10-09 by D19)
@@ -265,6 +306,7 @@ The application code from before the approved design is **retired, not reconcile
 - **Backend:** `memberships.services` `admit_offline_student`, `apply_renewal`, `archive_membership`; `payments.services.record_offline_payment`; dues selector; APIs #41 (renewal part), #48–#54, #56, #57.
 - **Dependencies:** T04 (`find_identity`), T10, T11, T14.
 - **Tests:** admission creates or links the user per the SPEC §4.6 table (new, existing, conflict, owner identity); admission vs online booking race on one seat (one wins); manual hold consumed by its owner's admission; renewal date arithmetic (on time, early, overdue ≤ 15 days, > 15 days) and renewal window (`RENEWAL_NOT_OPEN`); archival frees the seat and keeps history; dues sorted by days overdue; isolation.
+- **Implementation notes (2026-10-18), stacked on the T14 commit on `integration/payments-base`:** `memberships.services` `admit_offline_student` (#54, seat lock first, SPEC 4.6 identity table via `accounts.services.admit_identity`, the owner's manual hold on the seat is consumed and audited as `hold.consume`), `renew_offline` (#48), `apply_renewal` and `renewal_period` (D5: the period starts at the old due date, or today once more than `RENEWAL_RESTART_AFTER_OVERDUE_DAYS` = 15 days overdue), `archive_membership` (#52, Seat then Membership), `lookup_admission_identity` (#53); `payments.services.record_offline_payment` (amount = plan price, receipt from the sequence, `paid_at` within the last 30 days), `create_renewal_order` and `_confirm_renewal` (#41 renewal part; the same idempotent `confirm_payment`, so checkout, webhook and reconcile all extend the membership exactly once; a renewal paid after the membership was archived becomes `needs_refund`); selectors and APIs #49, #50, #51, #56, #57. The online renewal window (7 days before the due date, or overdue) applies to #41 only; #48 needs just an active membership. **Choices where the documents leave room:** (1) online renewals do not cancel older pending renewal orders (each is a separate real payment); (2) `payment_received` is sent to the student and the owner for an online renewal and to the student for an offline payment (admission or renewal), using the SPEC 4.5 key `payment:{id}:{type}:{recipient}`; (3) #51 omits `attendance_summary` and `complaints_count` until T20 and T21 exist, rather than returning made-up zeros. **Pending decisions (not implemented, not invented):** #52 says the student is notified and closes an open attendance record, but SPEC 3.13 lists no archive notification type and the attendance app is T20; the owner-release notification (T12) likewise has no type or key in SPEC 3.13 / 4.5. Both stay open until a SPEC-backed decision.
 
 ### Stage 4 — Operations
 
@@ -272,26 +314,31 @@ The application code from before the approved design is **retired, not reconcile
 - **Backend:** `AttendanceRecord` model, `check_in`, `check_out`, `auto_close_open_records` (+ scheduled step), P1-priority owner corrections; APIs #62–#67 (P0), #68–#70 (P1).
 - **Dependencies:** T11, T13.
 - **Tests:** one open record (double-tap concurrency); check-out without check-in; archived member rejected; check-in at another library rejected; auto-close at closing time; isolation.
+- **Implementation notes (2026-10-19):** `apps/attendance/` with `AttendanceRecord` (SPEC 3.15: one open record per student by a partial unique index, check-out after check-in, status matches check-out) and the services `check_in` (locks the membership row, so a double tap is serialised), `check_out`, `owner_check_in`, `owner_check_out`, `correct_record` (audited with a before and after diff), `close_for_membership` and `auto_close_open_records`; APIs **#62-#70** including the P1 owner tools. `archive_membership` (#52) now closes the student's open record at that library in the same transaction (audited as `attendance.check_out`). Auto-close uses the library's `closes_at`, or 23:59 business time, and is idempotent. Owner reads are scoped to the library; the live roster, history and #51 summary use the same selectors. Tests include 4 threads tapping check-in at once (exactly one wins).
 
 #### T21 Complaints · P4 · S · `feature/complaints`
 - **Backend:** `Complaint` model and services; APIs #71–#76 (image upload P1).
 - **Dependencies:** T11, T13.
 - **Tests:** only members (current or past) of the library can complain; transitions; response required to resolve; notifications; isolation.
+- **Implementation notes (2026-10-19):** `apps/complaints/` with `Complaint` (SPEC 3.16, with the resolved-has-time check) and `create_complaint` (a current or past member only; the latest membership is linked) and `respond` (owner only; open to in progress or resolved, resolved is final, a reply is required to resolve); APIs **#71-#76**. Notifications use the SPEC 4.5 key `complaint:{id}:{status}:{recipient}`: the owner gets `complaint_created` (status `open`), the student `complaint_updated`. **Not built:** the optional photo (CMP-06, P1), which needs private object storage.
 
 #### T22 Visits · P2 · S · `feature/visits`
 - **Backend:** `VisitRequest` model and services; APIs #77–#81. **Frontend:** visit dialog on the library page, `student/visits`, `owner/visits`.
 - **Dependencies:** T08, T13, T16.
 - **Tests:** one pending per library; date range; transitions; notifications; isolation.
+- **Implementation notes (2026-10-19):** `apps/visits/` with `VisitRequest` (SPEC 3.17: one pending request per student and library by a partial unique index) and `request_visit` (published library only, date from today to +60 days), `cancel_visit` and `decide`; APIs **#77-#81**. Keys `visit:{id}:{status}:{recipient}`. Frontend: `RequestVisitButton` on the library page, `student/visits`, `owner/visits`.
 
 #### T23 Analytics, dashboards and exports · P4 · M · `feature/analytics`
 - **Backend:** `apps/analytics/selectors.py` (owner dashboard, student dashboard, domain breakdown, occupancy, revenue, complaints), CSV writers; APIs #82–#89; adds `domain_breakdown` to #15 (coordinated PR with P2).
 - **Dependencies:** T15, T20, T21, T22.
 - **Tests:** each dashboard number equals its list's count (two libraries present); revenue counts successful payments only; CSV injection escaping; exports scoped to the library; audit-log view scoped and without IP.
+- **Implementation notes (2026-10-19):** `apps/analytics/` has no models. `selectors.py` composes figures only from the owning apps' selectors, so each dashboard number comes from the same query as its list (a test asserts the equality with two libraries present). APIs **#82-#89**: dashboards, occupancy, revenue (successful payments only, at most 366 days), complaint and domain reports, the CSV exports (streamed, `text/csv`, formula-injection escaping of `= + - @`, tab and CR, throttled with the `export` scope, audited) and the library-scoped activity log (no IP address). Revenue months use the Asia/Kolkata date. **Not done:** `domain_breakdown` on the public #15 (the owner dashboard has it).
 
 #### T24 Scheduled jobs and email delivery · P4 · M · `feature/scheduled-jobs`
 - **Backend:** `run_scheduled_jobs` command (orchestrator, `--only`, `--dry-run`, non-zero exit on failure), steps `renewal_notifications`, `owner_summaries`, `send_emails` (backoff, attempts), wiring of P2's `expire_holds`, P3's `reconcile_payments`, P4's `auto_close_attendance`; API #4 (job trigger, disabled unless the token is set).
 - **Dependencies:** T12, T14, T15, T20, T13.
 - **Tests:** run 5× → one notification per milestone; owner summary once per library per day; email retry and backoff; a failing step does not stop later steps; exit code.
+- **Implementation notes (2026-10-19):** `apps/core/jobs.py` runs the steps in order `expire_holds`, `reconcile_payments`, `auto_close_attendance`, `renewal_notifications`, `owner_summaries`, `send_emails`. `python manage.py run_scheduled_jobs [--only STEP] [--dry-run]` prints a JSON summary and exits non-zero if any step failed; a failing step does not stop the later ones; `--dry-run` rolls every database step back and skips email. Renewal reminders send `renewal_due_soon` (due within 3 days), `renewal_due_today` and `membership_overdue` once per due date (key `renewal:{membership}:{milestone}:{due_date}:{recipient}`); the owner summary is once per library per day (`owner_dues:{library}:{date}`). Email retries use the T13 backoff and the 5-attempt cap. **API #4** `POST /internal/jobs/run/` needs the `X-Job-Token` header, compared in constant time, and answers 404 unless `JOB_TRIGGER_TOKEN` is set. Run hourly from cron on the host; see `backend/.env.example`.
 
 ### Stage 5 — Frontend screens
 
@@ -301,6 +348,7 @@ The application code from before the approved design is **retired, not reconcile
 - **Must not reappear (legacy patterns):** `app/student/discover/`, `app/student/library/[id]/`, `components/seat-map/SeatGrid.tsx`, `components/charts/DomainChart.tsx` (replaced by P4's `DomainBars`), city presets, hardcoded amenities and shifts, `alert()` booking.
 - **Dependencies:** T03, T08, T09, T10, T12.
 - **Tests:** SeatMap states, keyboard navigation and screen-reader labels; booking panel handles `SEAT_UNAVAILABLE`, `HOLD_EXISTS`, `ALREADY_MEMBER`; login round-trip keeps the selection; Playwright: discover → library → select seat → hold.
+- **Update (2026-10-19):** `components/seat-map/seat-map.tsx` (labelled groups per row, arrow-key navigation, one tab stop, state shown by icon and text) and the booking panel on the library page (`components/library/booking-panel.tsx`: free seat plus plan, hold #38, then checkout; the choice survives a login round trip through the `seat` and `plan` query parameters; `SEAT_UNAVAILABLE` refreshes the map, `HOLD_EXISTS` offers to continue the booking). The visit dialog is on the library page too. **Still open:** `LibraryMap`, `LocationPicker`, `lib/geocode.ts`, `DomainBars` on the public page.
 
 #### T17 Owner onboarding, library settings and seat manager · P2 · L · `feature/owner-library-ui`
 - **Partial implementation (2026-10-18, only what needs T08/T09):** `owner/library` with the go-live checklist and Profile, Plans and Photos tabs (`components/owner/*`: `LibraryProfileForm` creates or edits, `PlansPanel`, `PhotosPanel`, `PublishChecklist`). Location is entered as latitude/longitude with "use my current location" until the map pin exists. **Still open and blocked by T10/T12:** the seat manager (`owner/seats`) and onboarding step 5 (seats). **Still open, no blocker but not built:** the 7-step `owner/onboarding` wizard (it reuses `LibraryProfileForm`; until it exists `AuthGuard` sends an owner without a library to a route that does not exist yet, so the create path in `owner/library` is reachable only after onboarding lands). No Playwright tests (same deviation as T07).
@@ -308,21 +356,25 @@ The application code from before the approved design is **retired, not reconcile
 - **Must not reappear (legacy patterns):** `app/owner/setup/page.tsx`.
 - **Dependencies:** T03, T08, T09, T10, T12.
 - **Tests:** wizard resumes at the first incomplete step; unsaved-changes warning; seat actions per status; Playwright: owner registers → onboarding → library live.
+- **Update (2026-10-19):** `owner/seats` (the seat manager: map, side panel with the actions that fit each status, add seats as a grid or a list, rename, block, release, maintenance, remove; every owner override asks for a reason) and `owner/onboarding` (profile, plans, photos, seats, go live; it opens at the first step that needs work). The wizard has five steps, not seven: the profile is one step.
 
 #### T18 Checkout and renewal · P3 · M · `feature/checkout-ui`
 - **Frontend:** `student/book/[holdId]/`, `student/memberships/[id]/renew/`, `components/booking/*` (HoldCountdown, PaymentSummary, RazorpayButton, PlanPicker), `lib/razorpay.ts`, `lib/api/payments.ts`.
 - **Dependencies:** T14, T15, T16.
 - **Tests:** checkout state machine (UI §5.3) including `confirming_slow` polling by `order_id`, `dismissed`, `expired`, `seat_lost`; countdown uses server offset; manual staging check with Razorpay test mode (success, failure, dismissed, UPI).
+- **Implementation notes (2026-10-19):** `student/book/[holdId]` and `student/memberships/[id]/renew` with `components/booking/*` (`usePaymentFlow` is the page state machine, `HoldCountdown` uses the server clock, `PaymentOutcome`) and `lib/razorpay.ts` (checkout.js is loaded only when a payment starts; the key id comes from the order response). States: ready, creating order, awaiting payment, verifying, success, confirming slowly (polls `GET /student/payments/?order_id=` every 3 s for 90 s and never asks to pay again), dismissed, failed, seat lost, expired. A `beforeunload` warning is active while a payment is in flight. **Not verified:** the real Razorpay window; tests replace it.
 
 #### T19 Membership, admission, dues and payments screens · P3 · L · `feature/membership-ui`
 - **Frontend:** `student/memberships/`, `student/payments/` (+ printable receipt), `owner/members/` (+ detail with archive and record-renewal dialogs), `owner/members/new` (admission with identity lookup and claim-code display), `owner/dues/`, `owner/payments/`; `lib/api/memberships.ts`.
 - **Dependencies:** T06b, T15, T17 (seat picker), T03.
 - **Tests:** admission identity states (none, existing, conflict); claim code shown once; archive confirmation; tables collapse to cards on mobile; Playwright: owner admits an offline student with cash.
+- **Implementation notes (2026-10-19):** student `memberships` (list, detail with period history), `payments` and a printable receipt; owner `members` (search, status and source filters, CSV export), member detail (renew and archive dialogs, attendance summary and complaint count), `members/new` (identity check showing masked contact details, seat and plan, payment received, no amount field), `dues` (record a payment from the row; the row carries the plan id so paying never changes the member's plan) and `payments` (ledger, filters, detail, export). **Not done:** showing the owner claim code (needs T06b).
 
 #### T25 Operations screens · P4 · L · `feature/operations-ui`
 - **Frontend:** `student/page.tsx` (dashboard), `owner/page.tsx` (dashboard), `student/attendance/`, `owner/attendance/`, `student/complaints/*`, `owner/complaints/*`, `student|owner/notifications/`, `owner/reports/`, `owner/activity/` (P1), `components/charts/*` (StatCard, OccupancyBar, DomainBars), `components/attendance/*`, `components/notifications/*` (bell in both shells, via a PR to P1's shells).
 - **Dependencies:** T13, T20, T21, T23, T03.
 - **Tests:** dashboard cards link to matching lists; check-in button states; complaint transitions; notification bell count; CSV download.
+- **Implementation notes (2026-10-19):** `student` and `owner` dashboards (cards link to the list they count), `attendance` for both roles (check-in card, live roster, history, corrections), `complaints` (student list, raise and detail; owner inbox and reply), `visits`, `notifications` with the bell in both shells (unread count refreshed each minute), `owner/reports` (occupancy, revenue, complaints, exam mix, exports) and `owner/activity`. Charts are accessible bars with the numbers written out.
 
 ### Stage 6 — Integration
 
@@ -408,3 +460,4 @@ A task is done only when **all** of these hold (AGENTS §12, FEATURES §1):
 | L1–L5 | Legal and contact content (SECURITY §19.1) | `[PRE-LAUNCH REQUIREMENT]`, not on the implementation critical path |
 | — | Email provider credentials | **Recorded 2026-10-09:** provided before staging email-flow testing. Local development uses the console email backend. Not a blocker for T00/T01. |
 | **D19** | Implementation strategy | **DECIDED 2026-10-09:** fresh implementation from the approved design; legacy code retired and preserved in `legacy/*` tags (T00, §5). Supersedes G1 and G2 (no reconciliation of legacy code). |
+- **Progress (2026-10-19):** `python manage.py seed_demo` (local only; refuses in production and without DEBUG unless `--force`; idempotent) creates a demo owner and library, six students with different due dates, payments, attendance, a complaint and a visit through the services. `apps/core/tests/test_e2e_journey.py` drives one full journey through the real API with registered and logged-in users (setup, booking, signed payment event, check-in, complaint, visit, admission, renewal, notifications, reports, export, isolation, archival). **Not done:** Playwright, the isolation matrix in every app, and the SECURITY section 20 run.

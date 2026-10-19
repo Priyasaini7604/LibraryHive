@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import transaction
+from django.core.validators import validate_email as django_validate_email
+from django.db import IntegrityError, transaction
 
 from apps.core import audit
 from apps.core.exceptions import AppError, Conflict, ValidationFailed
@@ -161,3 +162,52 @@ def update_profile(
         user.save(update_fields=["name", "phone", "domain", "updated_at"])
         audit.record(actor=user, action="profile.update", entity_type="user", entity_id=user.pk, changes=changes)
     return user
+
+
+# --- Owner-assisted admission identity (SPEC.md 4.6, OFF-01) ---------------------------------------------------
+
+
+def _admission_contacts(phone: str, email: str | None) -> tuple[str, str | None]:
+    email = normalize_email_address(email)
+    if email:
+        try:
+            django_validate_email(email)
+        except DjangoValidationError:
+            raise ValidationFailed(details={"email": ["Enter a valid email address."]}) from None
+    return _phone_or_error(phone), email
+
+
+def resolve_admission_identity(*, phone: str, email: str | None) -> User | None:
+    """The existing student an owner's admission would link to, or None if a new one is needed.
+
+    The decision table of SPEC.md 4.6: phone and email are looked up separately; different accounts are a 409
+    `IDENTITY_CONFLICT`; an owner account is a 409 `CONFLICT`. Names are never used.
+    """
+    phone, email = _admission_contacts(phone, email)
+    match = find_identity(email=email, phone=phone)
+    if match.conflicting:
+        raise Conflict("This phone number and email belong to different accounts.", code="IDENTITY_CONFLICT")
+    user = match.by_phone or match.by_email
+    if user is not None and user.role != User.Role.STUDENT:
+        raise Conflict("Library owners cannot be admitted as students.")
+    return user
+
+
+def admit_identity(*, name: str, phone: str, email: str | None, domain_code: str | None) -> tuple[User, bool]:
+    """Link the admission to an existing student, or create an offline one with an unusable password.
+
+    Returns (user, created). Call inside the admission transaction.
+    """
+    user = resolve_admission_identity(phone=phone, email=email)
+    if user is not None:
+        return user, False
+    phone, email = _admission_contacts(phone, email)
+    domain = _domain_for(User.Role.STUDENT, domain_code)
+    try:
+        with transaction.atomic():
+            created = User.objects.create_user(
+                email=email, name=name, role=User.Role.STUDENT, phone=phone, domain=domain, is_offline=True
+            )
+    except IntegrityError:  # a concurrent admission or signup took the phone or email first
+        raise Conflict("This phone number or email was just registered.", code="IDENTITY_CONFLICT") from None
+    return created, True

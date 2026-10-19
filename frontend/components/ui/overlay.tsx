@@ -50,7 +50,7 @@ export function DialogContent({ title, description, children, footer, className 
         {...focusReturn}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col",
-          "rounded-xl bg-white shadow-lg focus:outline-none",
+          "rounded-2xl border border-slate-200 bg-white shadow-[0_30px_90px_-20px_rgb(0_0_0/0.85)] focus:outline-none",
           className,
         )}
       >
@@ -92,7 +92,7 @@ export function SheetContent({ title, description, children, footer, className }
       <DialogPrimitive.Content
         {...focusReturn}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl bg-white shadow-lg focus:outline-none",
+          "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-20px_60px_-20px_rgb(0_0_0/0.8)] focus:outline-none",
           "lg:inset-y-0 lg:left-auto lg:right-0 lg:max-h-none lg:w-[420px] lg:rounded-none lg:rounded-l-2xl",
           className,
         )}

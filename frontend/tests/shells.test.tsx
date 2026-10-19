@@ -14,6 +14,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }),
 }));
 vi.mock("@/lib/auth-context", () => ({ useAuth: () => auth }));
+// The bell has its own test; here it only needs to exist in the header.
+vi.mock("@/components/notifications/notification-bell", () => ({
+  NotificationBell: ({ href }: { href: string }) => <a href={href}>Notifications</a>,
+}));
 
 describe("shells", () => {
   it("public shell offers log in and sign up to visitors, with a skip link", async () => {

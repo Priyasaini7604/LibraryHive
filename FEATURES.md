@@ -160,15 +160,18 @@
 | MEM-08 | Archived members list | SRS §4.3 | P0 | NOT IMPLEMENTED | P3 | The owner can view archived members and their history. |
 | MEM-09 | Seat change for an existing member | — | P2 | NOT IMPLEMENTED | — | Not specified in any source. Future. |
 
-### 3.8 Offline students and online/offline identity linking
+### 3.8 Owner-assisted admission and account claim
+
+> **Terminology.** "Offline" in LibraryHive never means the application works without internet. *Offline admission* (OFF-01, OFF-02, OFF-03, OFF-05) is **owner-assisted, walk-in registration**: a student visits the library and the owner registers them through the internet-connected owner dashboard, with no prior student self-registration. *Account claim* (OFF-04) is the later step where that student proves ownership of the record and turns it into an online account. Technical identifiers keep the word `offline` (`User.is_offline`, `Membership.source=offline`, `Payment.channel=offline`); user-facing labels say "Owner-assisted" or "Walk-in".
+
 
 | ID | Feature | Source | Priority | Status | Owner | Acceptance criteria |
 |---|---|---|---|---|---|---|
-| OFF-01 | Owner adds an offline/existing student (name, phone, optional email, domain) | NEW-F, SRS §3.2 | P0 | NOT IMPLEMENTED | P3 | Phone is required and normalised (E.164, India default). If a user with the same normalised phone or email exists, it is linked, never duplicated. A conflicting match (phone matches user X, email matches user Y) is rejected with a clear error. Email is optional, because the claim code (OFF-04) covers students without email. |
-| OFF-02 | Offline admission in one step: student + membership + seat + cash payment | NEW-F | P0 | NOT IMPLEMENTED | P3 | One atomic transaction. The seat is locked as in BOOK-02. Audited. |
-| OFF-03 | Unified member directory (online and offline) | F1 §5.1.6 | P0 | NOT IMPLEMENTED | P3 | Shown as one list with an "offline" badge. Same record per person. |
-| OFF-04 | Offline student claims the account online, without duplicate records | NEW-F, D4 | P0 | NOT IMPLEMENTED | P1 | Registration with a matching normalised phone or email **does not** auto-link. The student proves ownership (D4) with **an email OTP** (if the offline record has an email) **or a one-time claim code** issued by the owner. Codes are single-use, expire, and are attempt-limited. After verification the existing user record becomes an online account and all history becomes visible. Matching is **never** by name. |
-| OFF-05 | Duplicate prevention rules | NEW-F | P0 | NOT IMPLEMENTED | P3 | Unique normalised phone and unique email at DB level. Tests cover offline creation followed by online signup, the claim, and the conflicting-match case. |
+| OFF-01 | **Owner-assisted admission:** owner adds a walk-in or existing student (name, phone, optional email, domain) | NEW-F, SRS §3.2 | P0 | NOT IMPLEMENTED | P3 | Phone is required and normalised (E.164, India default). If a user with the same normalised phone or email exists, it is linked, never duplicated. A conflicting match (phone matches user X, email matches user Y) is rejected with a clear error. Email is optional, because the claim code (OFF-04) covers students without email. |
+| OFF-02 | **Owner-assisted admission** in one step: student + membership + seat + cash payment (the library's approved `PricingPlan` sets duration and fee; seats are full-day, D1; the cash payment is recorded as successful) | NEW-F | P0 | NOT IMPLEMENTED | P3 | One atomic transaction. The seat is locked as in BOOK-02. Audited. |
+| OFF-03 | **Owner-assisted admission:** unified member directory (online and walk-in students) | F1 §5.1.6 | P0 | NOT IMPLEMENTED | P3 | Shown as one list with an "offline" badge. Same record per person. |
+| OFF-04 | **Account claim:** a walk-in student claims their record as an online account, without duplicate records | NEW-F, D4 | P0 | NOT IMPLEMENTED | P1 | Registration with a matching normalised phone or email **does not** auto-link. The student proves ownership (D4) with **an email OTP** (if the offline record has an email) **or a one-time claim code** issued by the owner. Codes are single-use, expire, and are attempt-limited. After verification the existing user record becomes an online account and all history becomes visible. Matching is **never** by name. |
+| OFF-05 | **Owner-assisted admission:** duplicate prevention rules | NEW-F | P0 | NOT IMPLEMENTED | P3 | Unique normalised phone and unique email at DB level. Tests cover offline creation followed by online signup, the claim, and the conflicting-match case. |
 
 ### 3.9 Payments
 

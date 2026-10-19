@@ -35,6 +35,15 @@ INSTALLED_APPS = [
     "storages",
     "apps.core",
     "apps.accounts",
+    "apps.libraries",
+    "apps.seats",
+    "apps.memberships",
+    "apps.notifications",
+    "apps.payments",
+    "apps.attendance",
+    "apps.complaints",
+    "apps.visits",
+    "apps.analytics",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -202,6 +211,8 @@ REST_FRAMEWORK = {
         "hold_create": "10/min",
         "upload": "30/hour",
         "webhook": "120/min",
+        "export": "30/hour",
+        "job_trigger": "30/hour",
     },
     "NUM_PROXIES": config("NUM_PROXIES", default=None, cast=lambda v: None if v in (None, "") else int(v)),
 }
@@ -233,6 +244,17 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    # Several models share the field names "status" and "method"; pin their component names.
+    "ENUM_NAME_OVERRIDES": {
+        "PaymentStatusEnum": "apps.payments.models.Payment.Status",
+        "PaymentMethodEnum": "apps.payments.models.Payment.Method",
+        "PaymentChannelEnum": "apps.payments.models.Payment.Channel",
+        "ClaimChannelEnum": "apps.accounts.models.AccountClaim.Channel",
+        "OfflinePaymentMethodEnum": "apps.memberships.serializers.OFFLINE_METHOD_CHOICES",
+        "ComplaintStatusEnum": "apps.complaints.models.Complaint.Status",
+        "VisitStatusEnum": "apps.visits.models.VisitRequest.Status",
+        "AttendanceStatusEnum": "apps.attendance.models.AttendanceRecord.Status",
+    },
 }
 
 # --- CORS / CSRF / frontend (SECURITY.md section 11) ----------------------------
@@ -252,6 +274,15 @@ ADMIN_URL = config("ADMIN_URL", default="admin/")
 # --- Email ----------------------------------------------------------------------
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="LibraryHive <no-reply@localhost>")
+# When false, notify() still writes the in-app notification but creates no email delivery row.
+EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
+
+# --- Payments (SECURITY.md section 10): secrets come from the environment only, never from code -----
+RAZORPAY_KEY_ID = config("RAZORPAY_KEY_ID", default="")
+RAZORPAY_KEY_SECRET = config("RAZORPAY_KEY_SECRET", default="")
+RAZORPAY_WEBHOOK_SECRET = config("RAZORPAY_WEBHOOK_SECRET", default="")
+JOB_TRIGGER_TOKEN = config("JOB_TRIGGER_TOKEN", default="")  # empty: the fallback trigger (#4) is disabled
+PAYMENT_RECONCILE_AFTER_MINUTES = config("PAYMENT_RECONCILE_AFTER_MINUTES", default=30, cast=int)
 
 # --- Logging (BACKEND_ARCHITECTURE.md section 14, SECURITY.md section 16) --------
 LOG_LEVEL = config("LOG_LEVEL", default="INFO")

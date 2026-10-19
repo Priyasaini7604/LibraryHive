@@ -8,6 +8,15 @@ from django.urls import include, path
 api_v1 = [
     path("", include("apps.core.urls")),
     path("auth/", include("apps.accounts.urls")),
+    path("", include("apps.libraries.urls")),
+    path("", include("apps.seats.urls")),
+    path("notifications/", include("apps.notifications.urls")),
+    path("", include("apps.payments.urls")),
+    path("", include("apps.memberships.urls")),
+    path("", include("apps.attendance.urls")),
+    path("", include("apps.complaints.urls")),
+    path("", include("apps.visits.urls")),
+    path("", include("apps.analytics.urls")),
 ]
 
 urlpatterns = [

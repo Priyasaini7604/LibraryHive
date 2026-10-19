@@ -7,4 +7,5 @@ urlpatterns = [
     path("meta/domains/", views.DomainListView.as_view(), name="meta-domains"),
     path("meta/amenities/", views.AmenityListView.as_view(), name="meta-amenities"),
     path("schema/", views.SchemaView.as_view(), name="schema"),
+    path("internal/jobs/run/", views.JobTriggerView.as_view(), name="internal-jobs-run"),
 ]

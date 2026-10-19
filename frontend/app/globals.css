@@ -1,34 +1,142 @@
 @import "tailwindcss";
 
 /*
- * Design tokens (UI_ARCHITECTURE.md 2.1). Components use Tailwind's slate,
- * blue, green, amber, red and sky scales directly; these tokens name the few
- * brand-level values and the font.
+ * LibraryHive design tokens: a dark, layered theme (UI_ARCHITECTURE.md 2.1).
+ *
+ * Components use Tailwind's slate, blue, green, amber and red classes. Rather than rewrite every component, the
+ * scales are redefined here for a dark interface: the slate scale runs from the page background (50) to primary text
+ * (900), and the status colours keep their meaning (50 to 200 are dark tints, 700 to 900 are readable light text).
+ * One place therefore controls the whole look.
+ *
+ * Surfaces, darkest to lightest:  page -> surface (cards) -> raised (inputs, menus) -> hover.
+ * Accent: indigo to violet. Text contrast is checked against these values (white on the accent is above 5:1).
  */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-display-face), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Neutral scale, inverted: 50 is the page, 900 is primary text. */
+  --color-slate-50: #0a0b10;
+  --color-slate-100: #161926;
+  --color-slate-200: #232838;
+  --color-slate-300: #32384d;
+  --color-slate-400: #7a829d;
+  --color-slate-500: #8c93ab;
+  --color-slate-600: #a8afc3;
+  --color-slate-700: #c4c9d9;
+  --color-slate-800: #e0e3ed;
+  --color-slate-900: #f4f5fa;
+
+  /* Accent: indigo (blue scale), violet is added by the gradient in the utilities below. */
+  --color-blue-50: #141939;
+  --color-blue-100: #1b2150;
+  --color-blue-200: #2d3782;
+  --color-blue-300: #353f8f;
+  --color-blue-400: #7d8dff;
+  --color-blue-500: #6a7cff;
+  --color-blue-600: #4f5ee8;
+  --color-blue-700: #9aa8ff;
+  --color-blue-800: #b4beff;
+  --color-blue-900: #d0d6ff;
+
+  --color-sky-50: #0e2230;
+  --color-sky-800: #a5dcf5;
+
+  --color-green-50: #0b2218;
+  --color-green-100: #0f2d20;
+  --color-green-200: #1d5a40;
+  --color-green-300: #2f7d5a;
+  --color-green-700: #6ee7b7;
+  --color-green-800: #a7f3d0;
+  --color-green-900: #d1fae5;
+
+  --color-emerald-50: #0b2218;
+  --color-emerald-100: #0f2d20;
+  --color-emerald-200: #1d5a40;
+  --color-emerald-300: #2f7d5a;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+
+  --color-amber-50: #2a1d07;
+  --color-amber-100: #3a2809;
+  --color-amber-200: #5c4210;
+  --color-amber-300: #85601a;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-red-50: #2a0f14;
+  --color-red-100: #3a141b;
+  --color-red-200: #5c1f2a;
+  --color-red-300: #7a2a38;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
   --color-brand: var(--color-blue-600);
-  --color-brand-hover: var(--color-blue-700);
+  --color-brand-hover: #4350cc;
   --color-brand-tint: var(--color-blue-50);
+}
+
+:root {
+  color-scheme: dark;
+  --page: #07080c;
+  --surface: #0f1118;
+  --raised: #141722;
+  --hover: #1a1e2b;
+  --line: #232838;
+  --accent-from: #4f5ee8;
+  --accent-to: #7c4ddb;
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
 
   body {
-    background-color: var(--color-slate-50);
+    background-color: var(--page);
+    background-image:
+      radial-gradient(1100px 520px at 12% -8%, rgb(99 102 241 / 0.16), transparent 62%),
+      radial-gradient(900px 480px at 92% -6%, rgb(139 92 246 / 0.11), transparent 58%);
+    background-repeat: no-repeat;
     color: var(--color-slate-900);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Editorial headings: a tighter display face with a little negative tracking. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    word-spacing: 0.06em;
+  }
+
+  ::selection {
+    background-color: rgb(99 102 241 / 0.45);
+    color: #fff;
+  }
+
   :focus-visible {
-    outline-color: var(--color-blue-600);
+    outline-color: var(--color-blue-400);
+  }
+
+  /* Focus rings leave a gap in the page colour, not white. */
+  *,
+  ::before,
+  ::after {
+    --tw-ring-offset-color: var(--page);
   }
 
   @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
     *,
     *::before,
     *::after {
@@ -36,5 +144,184 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/*
+ * Overrides that a colour scale alone cannot express. They are unlayered on purpose, so they win over the
+ * generated utilities. Each keeps the meaning of the class it replaces.
+ */
+
+/* Cards, dialogs, menus and inputs were white: they are now the surface colour. */
+.bg-white {
+  background-color: var(--surface);
+}
+
+/* Primary buttons and selected controls: the accent gradient. */
+.bg-blue-600 {
+  background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+}
+
+.bg-blue-700,
+.hover\:bg-blue-700:hover {
+  background-color: #4350cc;
+  background-image: linear-gradient(135deg, #4350cc, #6a3fc4);
+}
+
+.disabled\:bg-blue-300:disabled {
+  background-image: none;
+}
+
+.hover\:bg-red-700:hover,
+.bg-red-700 {
+  background-color: #b91c1c;
+}
+
+/* Small coloured text on the dark surface needs the lighter shade to stay readable. */
+.text-blue-600 {
+  color: var(--color-blue-400);
+}
+
+.text-red-600 {
+  color: #f87171;
+}
+
+.text-green-600,
+.text-emerald-600 {
+  color: #34d399;
+}
+
+/* Overlays and tooltips: black scrim, raised tooltip. */
+.bg-slate-900\/50 {
+  background-color: rgb(0 0 0 / 0.65);
+  backdrop-filter: blur(3px);
+}
+
+.bg-slate-900 {
+  background-color: #2a3046;
+}
+
+/* Native date and time pickers follow the dark scheme. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"] {
+  color-scheme: dark;
+}
+
+/* Reusable pieces of the look. */
+.glass {
+  background-color: rgb(15 17 24 / 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.gradient-text {
+  background-image: linear-gradient(100deg, #a5b4ff 0%, #c4a5ff 55%, #f0abfc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-glow {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.card-glow:hover,
+.card-glow:focus-within {
+  border-color: rgb(125 141 255 / 0.55);
+  box-shadow:
+    0 0 0 1px rgb(125 141 255 / 0.18),
+    0 18px 50px -18px rgb(99 102 241 / 0.45);
+}
+
+/* Keyboard focus on a linked card gets a clear outline, not only the glow. */
+.card-glow:has(:focus-visible) {
+  outline: 2px solid var(--color-blue-400);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card-glow:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/*
+ * Printing (receipts): paper is white and printers usually drop backgrounds, so light text on dark surfaces would
+ * print as nothing. For print the original light palette is restored and the page effects are removed.
+ */
+@media print {
+  :root {
+    color-scheme: light;
+    --page: #ffffff;
+    --surface: #ffffff;
+    --color-slate-50: #f8fafc;
+    --color-slate-100: #f1f5f9;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-400: #94a3b8;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-700: #334155;
+    --color-slate-800: #1e293b;
+    --color-slate-900: #0f172a;
+    --color-blue-50: #eff6ff;
+    --color-blue-100: #dbeafe;
+    --color-blue-200: #bfdbfe;
+    --color-blue-300: #93c5fd;
+    --color-blue-400: #60a5fa;
+    --color-blue-700: #1d4ed8;
+    --color-blue-800: #1e40af;
+    --color-blue-900: #1e3a8a;
+    --color-green-50: #f0fdf4;
+    --color-green-100: #dcfce7;
+    --color-green-200: #bbf7d0;
+    --color-green-700: #15803d;
+    --color-green-800: #166534;
+    --color-green-900: #14532d;
+    --color-emerald-50: #ecfdf5;
+    --color-emerald-100: #d1fae5;
+    --color-emerald-200: #a7f3d0;
+    --color-emerald-700: #047857;
+    --color-emerald-800: #065f46;
+    --color-emerald-900: #064e3b;
+    --color-amber-50: #fffbeb;
+    --color-amber-100: #fef3c7;
+    --color-amber-200: #fde68a;
+    --color-amber-700: #b45309;
+    --color-amber-800: #92400e;
+    --color-amber-900: #78350f;
+    --color-red-50: #fef2f2;
+    --color-red-100: #fee2e2;
+    --color-red-200: #fecaca;
+    --color-red-700: #b91c1c;
+    --color-red-800: #991b1b;
+    --color-red-900: #7f1d1d;
+  }
+
+  body {
+    background: #ffffff;
+    background-image: none;
+  }
+
+  .bg-white {
+    background-color: #ffffff;
+    background-image: none;
+  }
+
+  .text-blue-600 {
+    color: #2563eb;
+  }
+
+  .text-red-600 {
+    color: #dc2626;
+  }
+
+  .text-green-600,
+  .text-emerald-600 {
+    color: #059669;
   }
 }

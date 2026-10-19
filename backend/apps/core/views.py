@@ -1,5 +1,6 @@
 """Platform endpoints: health (#1), vocabularies (#2, #3), OpenAPI schema (#5)."""
 
+import hmac
 import logging
 
 from django.conf import settings
@@ -8,8 +9,10 @@ from django.http import JsonResponse
 from drf_spectacular.utils import extend_schema
 from drf_spectacular.views import SpectacularAPIView
 from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from . import jobs
 from .models import Amenity, Domain
 from .responses import envelope, error_response, ok
 from .serializers import AmenitySerializer, DomainSerializer
@@ -51,6 +54,31 @@ class AmenityListView(APIView):
     @extend_schema(summary="Amenity vocabulary", responses=AmenitySerializer(many=True))
     def get(self, request):
         return ok(AmenitySerializer(Amenity.objects.filter(is_active=True), many=True).data)
+
+
+class JobTriggerView(APIView):
+    """#4: run the scheduled jobs from outside cron (for hosts without a scheduler).
+
+    Disabled (404) unless `JOB_TRIGGER_TOKEN` is set. The `X-Job-Token` header is compared in constant time;
+    no session or JWT is accepted. The jobs are idempotent, so a repeated call is harmless.
+    """
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+    parser_classes: list = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "job_trigger"
+
+    @extend_schema(summary="Run the scheduled jobs (token required)", request=None, responses={200: None})
+    def post(self, request):
+        expected = settings.JOB_TRIGGER_TOKEN
+        if not expected:
+            return error_response(status=404, code="NOT_FOUND", message="The requested resource was not found.")
+        supplied = request.headers.get("X-Job-Token", "")
+        if not hmac.compare_digest(supplied.encode(), expected.encode()):
+            logging.getLogger("apps.security").warning("security.invalid_job_token")
+            return error_response(status=403, code="FORBIDDEN_ROLE", message="Invalid job token.")
+        return ok(jobs.run_steps())
 
 
 class SchemaView(SpectacularAPIView):

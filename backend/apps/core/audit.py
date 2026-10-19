@@ -53,6 +53,7 @@ def record(
     action: str,
     entity_type: str,
     entity_id: uuid.UUID | str,
+    library=None,
     changes: dict[str, Any] | None = None,
     reason: str = "",
 ) -> AuditLog:
@@ -60,6 +61,7 @@ def record(
     safe_changes = {k: v for k, v in (changes or {}).items() if k.lower() not in SENSITIVE_KEYS}
     return AuditLog.objects.create(
         actor=actor,
+        library=library,
         actor_role=_actor_role(actor),
         action=action,
         entity_type=entity_type,

@@ -510,11 +510,13 @@ Renewal milestones use the **due date**, not the run date, in the key. A student
 
 Email delivery rows are created with the notification (when the recipient has an email). The job sends `pending` and retries `failed` rows (max 5 attempts with backoff), so a crash between send and status update can at most re-send one email for one notification. This is accepted at-least-once behaviour for email.
 
-### 4.6 Offline / online student identity and duplicate prevention
+### 4.6 Owner-assisted (offline) admission, account claim and duplicate prevention
+
+> "Offline" means **owner-assisted, walk-in registration** through the internet-connected owner dashboard; it never means the application works without internet. Admission (OFF-01/02/03/05) is built in T15; the owner-issued claim code is T06b; the account claim itself (OFF-04) is T06. The identifiers `is_offline`, `source=offline` and `channel=offline` keep their names.
 
 **Identity keys:** normalised `phone` (unique) and lowercased `email` (unique). **Names are never used for matching.**
 
-**Owner adds an offline student (OFF-01):**
+**Owner-assisted admission (OFF-01):**
 1. Normalise phone and email.
 2. Look up by phone and, separately, by email.
 3. Decide:

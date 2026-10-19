@@ -66,6 +66,16 @@ python manage.py runserver            # http://127.0.0.1:8000/api/v1/health/
 
 Generate local keys with `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
 
+Demo data and scheduled jobs (local use):
+
+```bash
+python manage.py seed_demo            # a labelled demo owner, library, members, payments and requests; refuses in production
+python manage.py run_scheduled_jobs   # expire holds, reconcile payments, close attendance, send reminders and email
+python manage.py run_scheduled_jobs --dry-run --only renewal_notifications   # see what a step would do, save nothing
+```
+
+`run_scheduled_jobs` is idempotent and meant to run hourly from cron on the host. For hosts without cron, set `JOB_TRIGGER_TOKEN` and call `POST /api/v1/internal/jobs/run/` with an `X-Job-Token` header; the endpoint answers 404 while the token is empty.
+
 Quality checks (the same ones CI runs):
 
 ```bash

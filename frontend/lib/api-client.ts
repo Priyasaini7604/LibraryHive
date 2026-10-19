@@ -163,3 +163,42 @@ export const api = {
   delete: <T>(path: string, options?: Omit<RequestOptions, "method" | "body">) =>
     request<T>(path, { ...options, method: "DELETE" }),
 };
+
+/**
+ * Fetch a file (a CSV export) with the access token. A plain link cannot carry the in-memory token, so the
+ * bytes are read here and saved by the caller (see lib/files.ts). A 401 refreshes once, like `request`.
+ */
+export async function downloadFile(
+  path: string,
+  query?: Record<string, QueryValue>,
+): Promise<{ blob: Blob; filename: string }> {
+  const attempt = async (): Promise<Response> => {
+    const token = tokenStore.get();
+    try {
+      return await fetch(buildUrl(path, query), {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "omit",
+      });
+    } catch {
+      throw new ApiError({ status: 0, code: NETWORK_ERROR, message: "Network request failed." });
+    }
+  };
+
+  let response = await attempt();
+  if (response.status === 401 && (await refreshAccessToken())) response = await attempt();
+  if (!response.ok) {
+    const isJson = response.headers.get("Content-Type")?.includes("application/json") ?? false;
+    const envelope = (isJson ? await response.json() : null) as Envelope<unknown> | null;
+    throw new ApiError({
+      status: response.status,
+      code: envelope?.error_code ?? `HTTP_${response.status}`,
+      message: envelope?.error ?? response.statusText ?? "Request failed.",
+      details: envelope?.details ?? null,
+      requestId: envelope?.request_id ?? response.headers.get("X-Request-ID"),
+    });
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? path.split("/").pop() ?? "download";
+  return { blob: await response.blob(), filename };
+}

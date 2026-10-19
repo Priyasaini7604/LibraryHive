@@ -14,6 +14,11 @@ PUBLIC_ENDPOINTS = {
     "health",
     "meta-domains",
     "meta-amenities",
+    "library-list",
+    "library-detail",
+    "library-seats",
+    "payment-webhook-razorpay",  # signature is its authentication (SECURITY.md 10.3)
+    "internal-jobs-run",  # authenticated by the X-Job-Token header; 404 unless JOB_TRIGGER_TOKEN is set (#4)
     "schema",  # public only when settings.SCHEMA_PUBLIC (non-production); see test_platform_views
     # Auth endpoints (SECURITY.md section 5); cookie endpoints also require the frontend Origin.
     "auth-register",

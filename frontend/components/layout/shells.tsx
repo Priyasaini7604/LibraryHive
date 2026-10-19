@@ -45,10 +45,13 @@ function SkipLink() {
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 font-semibold text-slate-900">
-      <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-lg bg-blue-600 text-sm text-white">
+      <span
+        aria-hidden="true"
+        className="flex size-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-[0_6px_18px_-4px_rgb(99_102_241/0.8)]"
+      >
         LH
       </span>
-      LibraryHive
+      <span className="font-display text-lg tracking-tight">LibraryHive</span>
     </Link>
   );
 }
@@ -86,7 +89,7 @@ function BottomBar({ items, pathname, extra }: { items: NavItem[]; pathname: str
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white px-1 pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white px-1 pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden"
     >
       {items.map((item) => (
         <NavLink key={item.href} item={item} active={item.href === active} compact />
@@ -135,7 +138,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <SkipLink />
-      <header className="border-b border-slate-200 bg-white">
+      <header className="glass sticky top-0 z-30 border-b border-white/10 print:hidden">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <Logo />
           <nav aria-label="Primary" className="flex items-center gap-2">
@@ -162,6 +165,41 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
       <main id="main" className="flex-1">
         {children}
       </main>
+      <footer className="border-t border-white/10 bg-slate-50/60 print:hidden">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div className="flex max-w-xs flex-col gap-3">
+            <Logo />
+            <p className="text-sm text-slate-600">Find a study library near you, see which seats are free and book yours in minutes.</p>
+          </div>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-10 gap-y-3 text-sm">
+            <ul className="flex flex-col gap-2">
+              <li>
+                <Link href="/discover" className="text-slate-700 hover:text-slate-900">
+                  Browse libraries
+                </Link>
+              </li>
+              <li>
+                <Link href="/register" className="text-slate-700 hover:text-slate-900">
+                  Create an account
+                </Link>
+              </li>
+            </ul>
+            <ul className="flex flex-col gap-2">
+              <li>
+                <Link href="/register" className="text-slate-700 hover:text-slate-900">
+                  Run a library
+                </Link>
+              </li>
+              <li>
+                <Link href="/claim" className="text-slate-700 hover:text-slate-900">
+                  Claim your account
+                </Link>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <p className="border-t border-white/5 px-4 py-4 text-center text-xs text-slate-500">© LibraryHive. Seats, simply.</p>
+      </footer>
     </div>
   );
 }
@@ -174,7 +212,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50">
       <SkipLink />
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+      <header className="glass sticky top-0 z-20 border-b border-white/10 print:hidden">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <Logo />
           <nav aria-label="Student" className="hidden items-center gap-1 lg:flex">
@@ -206,7 +244,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh bg-slate-50">
       <SkipLink />
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4 lg:flex print:hidden">
         <Logo />
         <nav aria-label="Owner" className="flex flex-col gap-1">
           {OWNER_NAV.map((item) => (
@@ -215,7 +253,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-6">
+        <header className="glass sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/10 px-4 sm:px-6 print:hidden">
           <div className="lg:hidden">
             <Logo />
           </div>

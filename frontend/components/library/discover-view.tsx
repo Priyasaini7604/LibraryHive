@@ -61,12 +61,25 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "h-9 rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
-        active ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400",
+        "h-9 rounded-full border px-3.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 motion-reduce:transition-none",
+        active
+          ? "border-transparent bg-blue-600 text-white shadow-[0_6px_20px_-6px_rgb(99_102_241/0.7)]"
+          : "border-slate-300 bg-slate-100/40 text-slate-700 hover:border-blue-400/60 hover:bg-blue-50 hover:text-slate-900",
       )}
     >
       {children}
     </button>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
+      <span aria-hidden="true" className="w-full text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 sm:w-24">
+        {label}
+      </span>
+      {children}
+    </div>
   );
 }
 
@@ -144,87 +157,107 @@ export function DiscoverView() {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-slate-900">Find a study library</h1>
-        <p className="text-slate-600">Search by name or area, then pick the one that suits you.</p>
-      </header>
+    <div className="flex flex-col">
+      <section className="relative isolate overflow-hidden border-b border-white/5">
+        <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-32 -z-10 size-[26rem] rounded-full bg-indigo-500/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-20 top-10 -z-10 size-[22rem] rounded-full bg-violet-500/15 blur-3xl" />
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 pb-12 pt-12 sm:px-6 sm:pb-16 sm:pt-20">
+          <header className="flex max-w-3xl flex-col gap-5">
+            <p className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgb(52_211_153/0.6)]" />
+              Live seat availability
+            </p>
+            <h1 className="text-4xl font-extrabold leading-[1.06] tracking-[-0.03em] text-slate-900 sm:text-6xl">
+              Find a study library
+              <span className="gradient-text block">that fits how you work.</span>
+            </h1>
+            <p className="max-w-xl text-lg text-slate-600">Search by name or area, compare plans and seats, then book the one that suits you.</p>
+          </header>
 
-      <form
-        role="search"
-        aria-label="Search libraries"
-        className="flex flex-col gap-3 sm:flex-row sm:items-center"
-        onSubmit={(event) => {
-          event.preventDefault();
-          update({ ...filters, search: searchText.trim() || undefined });
-        }}
-      >
-        <div className="relative flex-1">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-          <Input
-            type="search"
-            aria-label="Search area or library"
-            placeholder="Search area or library…"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            className="pl-9"
-          />
+          <form
+            role="search"
+            aria-label="Search libraries"
+            className="glass flex flex-col gap-3 rounded-2xl border border-white/10 p-3 shadow-[0_24px_60px_-30px_rgb(0_0_0/0.8)] sm:flex-row sm:items-center"
+            onSubmit={(event) => {
+              event.preventDefault();
+              update({ ...filters, search: searchText.trim() || undefined });
+            }}
+          >
+            <div className="relative flex-1">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500" />
+              <Input
+                type="search"
+                aria-label="Search area or library"
+                placeholder="Search area or library…"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                className="h-12 border-transparent bg-slate-50/70 pl-11 text-base"
+              />
+            </div>
+            <Button variant="secondary" size="lg" onClick={useMyLocation} loading={locating}>
+              <LocateFixed aria-hidden="true" className="size-4" /> Use my location
+            </Button>
+            <div className="sm:w-52">
+              <label htmlFor="sort-libraries" className="sr-only">
+                Sort libraries
+              </label>
+              <Select
+                id="sort-libraries"
+                value={filters.sort ?? "default"}
+                onValueChange={(value) => update({ ...filters, sort: value === "default" ? undefined : (value as LibrarySort) })}
+                options={[
+                  { value: "default", label: hasLocation ? "Sort: Nearest" : "Sort: Name" },
+                  { value: "distance", label: "Nearest first", disabled: !hasLocation },
+                  { value: "price", label: "Lowest price" },
+                ]}
+              />
+            </div>
+          </form>
+
+          {locationMessage && <Alert tone="warning">{locationMessage}</Alert>}
+
+          <section aria-label="Filters" className="flex flex-col gap-3">
+            {(domains.data?.length ?? 0) > 0 && (
+              <FilterGroup label="Exam">
+                {domains.data?.map((domain) => (
+                  <Chip
+                    key={domain.code}
+                    active={filters.domain === domain.code}
+                    onClick={() => update({ ...filters, domain: filters.domain === domain.code ? undefined : domain.code })}
+                  >
+                    {domain.name}
+                  </Chip>
+                ))}
+              </FilterGroup>
+            )}
+            {(amenities.data?.length ?? 0) > 0 && (
+              <FilterGroup label="Amenities">
+                {amenities.data?.map((amenity) => (
+                  <Chip key={amenity.code} active={filters.amenity?.includes(amenity.code) ?? false} onClick={() => toggleAmenity(amenity.code)}>
+                    {amenity.name}
+                  </Chip>
+                ))}
+              </FilterGroup>
+            )}
+          </section>
         </div>
-        <Button variant="secondary" onClick={useMyLocation} loading={locating}>
-          <LocateFixed aria-hidden="true" className="size-4" /> Use my location
-        </Button>
-        <div className="sm:w-48">
-          <label htmlFor="sort-libraries" className="sr-only">
-            Sort libraries
-          </label>
-          <Select
-            id="sort-libraries"
-            value={filters.sort ?? "default"}
-            onValueChange={(value) => update({ ...filters, sort: value === "default" ? undefined : (value as LibrarySort) })}
-            options={[
-              { value: "default", label: hasLocation ? "Sort: Nearest" : "Sort: Name" },
-              { value: "distance", label: "Nearest first", disabled: !hasLocation },
-              { value: "price", label: "Lowest price" },
-            ]}
-          />
-        </div>
-      </form>
-
-      {locationMessage && <Alert tone="warning">{locationMessage}</Alert>}
-
-      <section aria-label="Filters" className="flex flex-col gap-2">
-        {(domains.data?.length ?? 0) > 0 && (
-          <div role="group" aria-label="Exam" className="flex flex-wrap gap-2">
-            {domains.data?.map((domain) => (
-              <Chip
-                key={domain.code}
-                active={filters.domain === domain.code}
-                onClick={() => update({ ...filters, domain: filters.domain === domain.code ? undefined : domain.code })}
-              >
-                {domain.name}
-              </Chip>
-            ))}
-          </div>
-        )}
-        {(amenities.data?.length ?? 0) > 0 && (
-          <div role="group" aria-label="Amenities" className="flex flex-wrap gap-2">
-            {amenities.data?.map((amenity) => (
-              <Chip key={amenity.code} active={filters.amenity?.includes(amenity.code) ?? false} onClick={() => toggleAmenity(amenity.code)}>
-                {amenity.name}
-              </Chip>
-            ))}
-          </div>
-        )}
       </section>
 
-      <section aria-label="Libraries" aria-live="polite" className="flex flex-col gap-3">
+      <section aria-label="Libraries" aria-live="polite" className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-10 sm:px-6">
         {list.isPending ? (
-          <div aria-busy="true" className="flex flex-col gap-3">
+          <div aria-busy="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <span className="sr-only" role="status">
               Loading libraries
             </span>
             {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-32 w-full" />
+              <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <Skeleton className="aspect-[16/10] w-full rounded-none" />
+                <div className="flex flex-col gap-3 p-5">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-2 w-full" />
+                </div>
+              </div>
             ))}
           </div>
         ) : list.isError ? (
@@ -243,10 +276,21 @@ export function DiscoverView() {
           />
         ) : (
           <>
-            <p className="text-sm text-slate-600">
-              {list.data?.pages[0]?.total} {list.data?.pages[0]?.total === 1 ? "library" : "libraries"}
-            </p>
-            <ul className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm text-slate-600">
+                {list.data?.pages[0]?.total} {list.data?.pages[0]?.total === 1 ? "library" : "libraries"}
+              </p>
+              {hasFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="rounded text-sm font-medium text-blue-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  Reset filters
+                </button>
+              )}
+            </div>
+            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((library) => (
                 <li key={library.id} className="relative">
                   <LibraryCard library={library} names={names} />
@@ -254,7 +298,7 @@ export function DiscoverView() {
               ))}
             </ul>
             {list.hasNextPage && (
-              <Button variant="secondary" className="self-center" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
+              <Button variant="secondary" size="lg" className="self-center" loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
                 Load more
               </Button>
             )}

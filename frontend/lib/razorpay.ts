@@ -77,7 +77,7 @@ export async function openCheckout(order: PaymentOrder, handlers: CheckoutHandle
     name: "LibraryHive",
     description: order.description,
     prefill: { name: order.prefill.name, email: order.prefill.email, contact: order.prefill.phone },
-    theme: { color: "#2563EB" },
+    theme: { color: "#4F5EE8" },
     handler: handlers.onSuccess,
     modal: { ondismiss: handlers.onDismiss },
   });

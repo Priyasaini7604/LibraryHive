@@ -3,7 +3,15 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border border-slate-200 bg-white bg-gradient-to-b from-white/[0.035] to-transparent shadow-[0_1px_0_0_rgb(255_255_255/0.04)_inset]",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

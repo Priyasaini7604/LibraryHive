@@ -18,7 +18,7 @@ export function AuthCard({
       <Card>
         <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+            <h1 className="text-3xl font-extrabold tracking-[-0.025em] text-slate-900">{title}</h1>
             {description && <p className="text-sm text-slate-600">{description}</p>}
           </div>
           {children}

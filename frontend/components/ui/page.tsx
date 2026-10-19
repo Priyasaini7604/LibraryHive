@@ -17,8 +17,8 @@ export function PageHeader({
   return (
     <header className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        {description && <p className="max-w-2xl text-sm text-slate-600">{description}</p>}
+        <h1 className="text-3xl font-extrabold tracking-[-0.025em] text-slate-900 sm:text-4xl">{title}</h1>
+        {description && <p className="max-w-2xl text-base text-slate-600">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>

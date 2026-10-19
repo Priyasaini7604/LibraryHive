@@ -74,11 +74,11 @@ export function LibraryPage({ id }: { id: string }) {
   const counts = library.seat_counts;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-8 sm:px-6">
       <PhotoGallery photos={library.photos} libraryName={library.name} />
 
       <header className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">{library.name}</h1>
+        <h1 className="text-4xl font-extrabold leading-tight tracking-[-0.03em] text-slate-900 sm:text-5xl">{library.name}</h1>
         <p className="flex flex-wrap items-center gap-x-2 text-slate-700">
           <MapPin aria-hidden="true" className="size-4 shrink-0" />
           <span>
@@ -90,7 +90,7 @@ export function LibraryPage({ id }: { id: string }) {
             <span className="sr-only"> (opens in a new tab)</span>
           </a>
         </p>
-        <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-700">
+        <ul className="flex flex-wrap gap-2 text-sm text-slate-700 [&>li]:rounded-full [&>li]:border [&>li]:border-slate-200 [&>li]:bg-slate-100 [&>li]:px-3.5 [&>li]:py-1.5">
           {opening && (
             <li className="flex items-center gap-1.5">
               <Clock aria-hidden="true" className="size-4" /> {opening}
@@ -131,16 +131,18 @@ export function LibraryPage({ id }: { id: string }) {
 
       {counts && (
         <section aria-labelledby="seats-heading">
-          <h2 id="seats-heading" className="mb-2 text-lg font-semibold text-slate-900">
+          <h2 id="seats-heading" className="mb-4 text-2xl font-bold text-slate-900">
             Seats
           </h2>
-          <BookingPanel libraryId={library.id} plans={library.plans} />
+          <div className="rounded-2xl border border-slate-200 bg-white bg-gradient-to-b from-white/[0.035] to-transparent p-5 sm:p-7">
+            <BookingPanel libraryId={library.id} plans={library.plans} />
+          </div>
         </section>
       )}
 
       {library.amenities.length > 0 && (
         <section aria-labelledby="amenities-heading">
-          <h2 id="amenities-heading" className="mb-2 text-lg font-semibold text-slate-900">
+          <h2 id="amenities-heading" className="mb-4 text-2xl font-bold text-slate-900">
             Amenities
           </h2>
           <ul className="flex flex-wrap gap-2">
@@ -154,7 +156,7 @@ export function LibraryPage({ id }: { id: string }) {
       )}
 
       <section aria-labelledby="plans-heading">
-        <h2 id="plans-heading" className="mb-2 text-lg font-semibold text-slate-900">
+        <h2 id="plans-heading" className="mb-4 text-2xl font-bold text-slate-900">
           Plans
         </h2>
         {library.plans.length === 0 ? (
@@ -163,7 +165,7 @@ export function LibraryPage({ id }: { id: string }) {
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {library.plans.map((plan) => (
               <li key={plan.id}>
-                <Card>
+                <Card className="card-glow">
                   <CardHeader>
                     <CardTitle>{plan.name}</CardTitle>
                   </CardHeader>

@@ -52,7 +52,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         <SelectPrimitive.Content
           position="popper"
           sideOffset={4}
-          className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+          className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-slate-300 bg-white shadow-[0_20px_50px_-15px_rgb(0_0_0/0.8)]"
         >
           <SelectPrimitive.Viewport className="p-1">
             {options.map((option) => (

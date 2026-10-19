@@ -24,7 +24,7 @@ export function PhotoGallery({ photos, libraryName }: { photos: PublicPhoto[]; l
       <div
         role="img"
         aria-label={`No photos of ${libraryName} yet`}
-        className="flex aspect-[16/7] items-center justify-center rounded-xl bg-slate-100 text-slate-400"
+        className="flex aspect-[16/7] items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-400"
       >
         <Building2 aria-hidden="true" className="size-12" />
       </div>
@@ -39,17 +39,17 @@ export function PhotoGallery({ photos, libraryName }: { photos: PublicPhoto[]; l
 
   return (
     <>
-      <div className="grid gap-2 sm:grid-cols-4 sm:grid-rows-2">
+      <div className={others.length === 0 ? "grid gap-2" : "grid gap-2 sm:h-[26rem] sm:grid-cols-4 sm:grid-rows-2"}>
         <button
           type="button"
           onClick={() => show(cover)}
-          className="overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:col-span-2 sm:row-span-2"
+          className={`group overflow-hidden rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${others.length === 0 ? "" : "sm:col-span-2 sm:row-span-2"}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- photos come from the object store */}
           <img
             src={mediaUrl(cover.url)}
             alt={cover.caption || `${libraryName}, cover photo`}
-            className="aspect-[4/3] size-full object-cover sm:aspect-auto"
+            className={`size-full object-cover transition-transform duration-500 group-hover:scale-[1.03] motion-reduce:transition-none ${others.length === 0 ? "aspect-[21/9]" : "aspect-[4/3] sm:aspect-auto"}`}
           />
         </button>
         {others.map((photo) => (
@@ -57,14 +57,14 @@ export function PhotoGallery({ photos, libraryName }: { photos: PublicPhoto[]; l
             key={photo.id}
             type="button"
             onClick={() => show(photo)}
-            className="hidden overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:block"
+            className="group hidden overflow-hidden rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 sm:block"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- photos come from the object store */}
             <img
               src={mediaUrl(photo.thumb_url)}
               alt={photo.caption || `${libraryName}, photo`}
               loading="lazy"
-              className="size-full object-cover"
+              className="size-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
             />
           </button>
         ))}

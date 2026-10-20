@@ -9,6 +9,7 @@ from apps.core.models import AuditLog
 from apps.core.tests.factories import make_owner, make_student
 from apps.memberships.models import Membership
 from apps.memberships.tests.test_membership_model import make_membership
+from apps.notifications.models import Notification
 from apps.payments.models import Payment
 from apps.payments.tests.base import PaymentTestCase, bookable_library, client_for
 
@@ -78,6 +79,25 @@ class ArchiveTests(LifecycleBase):
         self.assertTrue(AuditLog.objects.filter(action="membership.archive", entity_id=self.membership.pk).exists())
         # The seat is free at once: another student can hold it.
         self.assertEqual(self.hold_seat(student=make_student()).status, "pending")
+
+    def test_the_student_is_told_once_and_the_owner_is_not(self):
+        self.archive(reason="Internal note: unpaid for months")
+        note = Notification.objects.get(type="membership_archived")
+        self.assertEqual(note.recipient_id, self.student.pk)
+        self.assertEqual(note.dedup_key, f"membership:{self.membership.pk}:archived:{self.student.pk}")
+        self.assertEqual((note.entity_type, note.entity_id), ("membership", self.membership.pk))
+        self.assertIn(self.seat.label, note.body)
+        self.assertNotIn("unpaid", note.title + note.body)  # the owner's reason is never shown to the student
+        self.assertFalse(Notification.objects.filter(recipient=self.library.owner).exists())
+        self.assertEqual(self.archive().status_code, 409)  # a repeat is refused and adds nothing
+        self.assertEqual(Notification.objects.filter(type="membership_archived").count(), 1)
+
+    def test_a_returning_student_who_is_archived_again_is_told_again_because_it_is_a_new_row(self):
+        self.archive()
+        again = make_membership(library=self.library, plan=self.plan, student=self.student, seat=self.seat)
+        self.archive(membership=again)
+        keys = set(Notification.objects.filter(type="membership_archived").values_list("dedup_key", flat=True))
+        self.assertEqual(len(keys), 2)
 
     def test_archived_twice_is_a_conflict(self):
         self.archive()

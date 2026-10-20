@@ -340,7 +340,7 @@ Only **signature-valid** events are stored. Invalid ones are rejected (400) and 
 |---|---|---|---|
 | recipient_id | FK → User | | `PROTECT` |
 | library_id | FK → Library | N | `PROTECT` |
-| type | varchar(40) | | `renewal_due_soon`, `renewal_due_today`, `membership_overdue`, `owner_daily_dues_summary`, `booking_confirmed`, `payment_received`, `payment_needs_refund`, `complaint_created`, `complaint_updated`, `visit_requested`, `visit_decided`, `account_claimed` |
+| type | varchar(40) | | `renewal_due_soon`, `renewal_due_today`, `membership_overdue`, `owner_daily_dues_summary`, `booking_confirmed`, `payment_received`, `payment_needs_refund`, `complaint_created`, `complaint_updated`, `visit_requested`, `visit_decided`, `account_claimed`, `hold_released`, `membership_archived` |
 | title | varchar(150) | | |
 | body | varchar(1000) | | |
 | entity_type, entity_id | varchar(40), UUID | N | deep-link target |
@@ -503,6 +503,8 @@ stateDiagram-v2
 | Booking confirmed / payment received | `payment:{payment_id}:{type}:{recipient_id}` |
 | Complaint created / updated | `complaint:{complaint_id}:{status}:{recipient_id}` |
 | Visit requested / decided | `visit:{visit_id}:{status}:{recipient_id}` |
+| Owner released a student's booking hold (student only) | `hold:{hold_id}:released:{recipient_id}` |
+| Membership archived (student only; the owner is not notified) | `membership:{membership_id}:archived:{recipient_id}` |
 
 Insertion uses `INSERT … ON CONFLICT (dedup_key) DO NOTHING` (`bulk_create(ignore_conflicts=True)`). Re-running the job any number of times creates no duplicates (NOT-06).
 

@@ -12,6 +12,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The browser end-to-end suite builds into its own folder so it never disturbs a running dev server.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   reactStrictMode: true,
   poweredByHeader: false,
   // Django URLs end with a slash; keep them intact through the auth rewrite.

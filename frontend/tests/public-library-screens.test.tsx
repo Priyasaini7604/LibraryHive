@@ -87,6 +87,7 @@ const detail: LibraryDetail = {
     { id: "ph1", url: "/media/public/a.webp", thumb_url: "/media/public/a_thumb.webp", caption: "Reading hall", is_cover: true },
     { id: "ph2", url: "/media/public/b.webp", thumb_url: "/media/public/b_thumb.webp", caption: "", is_cover: false },
   ],
+  domain_breakdown: [],
 };
 
 beforeEach(() => {
@@ -276,6 +277,30 @@ describe("LibraryPage", () => {
     expect(await screen.findByText("We couldn't load this library.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(await screen.findByRole("heading", { level: 1, name: "Silent Hive" })).toBeInTheDocument();
+  });
+
+  it("shows who studies here from the API's domain counts, and an invitation when there are none", async () => {
+    mocks.fetchLibrary.mockResolvedValueOnce({
+      ...detail,
+      domain_breakdown: [
+        { code: "upsc", name: "UPSC", count: 5 },
+        { code: "neet", name: "NEET", count: 2 },
+      ],
+    });
+    const first = renderWithClient(<LibraryPage id="l1" />);
+    const section = within(await screen.findByRole("region", { name: "Who studies here" }));
+    expect(section.getByRole("list", { name: "Members by exam" })).toBeInTheDocument();
+    expect(section.getByText("UPSC")).toBeInTheDocument();
+    expect(section.getByText("5")).toBeInTheDocument();
+    expect(section.getByText("NEET")).toBeInTheDocument();
+    expect(section.queryByText("Be among the first members.")).not.toBeInTheDocument();
+    first.unmount();
+
+    mocks.fetchLibrary.mockResolvedValueOnce({ ...detail, domain_breakdown: [] });
+    renderWithClient(<LibraryPage id="l1" />);
+    const empty = within(await screen.findByRole("region", { name: "Who studies here" }));
+    expect(empty.getByText("Be among the first members.")).toBeInTheDocument();
+    expect(empty.queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("handles a library with no photos, plans or amenities", async () => {

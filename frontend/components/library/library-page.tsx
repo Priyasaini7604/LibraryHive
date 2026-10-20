@@ -5,6 +5,7 @@ import { Clock, ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 
 import { BookingPanel } from "@/components/library/booking-panel";
+import { DomainBars } from "@/components/charts/bars";
 import { RequestVisitButton } from "@/components/visits/request-visit-dialog";
 import { PhotoGallery } from "@/components/library/photo-gallery";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,17 @@ export function LibraryPage({ id }: { id: string }) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="members-heading">
+        <h2 id="members-heading" className="mb-4 text-2xl font-bold text-slate-900">
+          Who studies here
+        </h2>
+        {library.domain_breakdown.length === 0 ? (
+          <p className="text-slate-700">Be among the first members.</p>
+        ) : (
+          <DomainBars rows={library.domain_breakdown} />
         )}
       </section>
     </div>

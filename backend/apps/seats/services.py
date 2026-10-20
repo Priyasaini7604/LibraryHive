@@ -19,6 +19,7 @@ from apps.core import audit
 from apps.core.exceptions import Conflict, NotFound, ValidationFailed
 from apps.libraries import services as library_services
 from apps.libraries.models import Library, PricingPlan
+from apps.notifications import services as notifications
 
 from .models import Seat, SeatHold
 
@@ -373,6 +374,19 @@ def _release_hold(*, library: Library, hold: SeatHold, actor, reason: str) -> Se
         changes={"kind": hold.kind},
         reason=reason.strip(),
     )
+    if hold.kind == SeatHold.Kind.BOOKING and hold.student_id:
+        # Only a student's own booking hold has someone to tell; an owner's manual hold does not.
+        notifications.notify(
+            recipient=hold.student,
+            type="hold_released",
+            title="Your seat hold was released",
+            body=(
+                f"{library.name} released your hold on seat {hold.seat.label}. "
+                "If you still want a seat, choose one again from the library page."
+            ),
+            dedup_key=f"hold:{hold.pk}:released:{hold.student_id}",
+            entity=("library", library.pk),
+        )
     logger.info("Seat hold released", extra={"hold_id": str(hold.pk), "actor_id": str(actor.pk)})
     return hold
 

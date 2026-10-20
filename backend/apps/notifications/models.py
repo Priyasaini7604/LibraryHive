@@ -31,6 +31,8 @@ class Notification(BaseModel):
         VISIT_REQUESTED = "visit_requested", "Visit requested"
         VISIT_DECIDED = "visit_decided", "Visit decided"
         ACCOUNT_CLAIMED = "account_claimed", "Account claimed"
+        HOLD_RELEASED = "hold_released", "Seat hold released"
+        MEMBERSHIP_ARCHIVED = "membership_archived", "Membership ended"
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="notifications")
     type = models.CharField(max_length=40, choices=Type.choices)

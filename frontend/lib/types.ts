@@ -111,6 +111,13 @@ export interface LibrarySummary {
   distance_km?: number;
 }
 
+/** Current members of one exam domain (#15 `domain_breakdown`); counts only, never identities. */
+export interface DomainShare {
+  code: string;
+  name: string;
+  count: number;
+}
+
 /** The public explore page (#15). */
 export interface LibraryDetail {
   id: string;
@@ -131,6 +138,7 @@ export interface LibraryDetail {
   plans: PricingPlan[];
   photos: PublicPhoto[];
   seat_counts?: SeatCounts;
+  domain_breakdown: DomainShare[];
 }
 
 export interface PublishChecklist {

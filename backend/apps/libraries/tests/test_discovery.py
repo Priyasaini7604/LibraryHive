@@ -133,7 +133,7 @@ class DiscoveryTests(LibraryTestCase):
         self.assertEqual([p["name"] for p in data["plans"]], ["Monthly"])
         self.assertEqual(set(data["plans"][0]), {"id", "name", "duration_days", "price", "timing_note"})
         self.assertEqual({a["code"] for a in data["amenities"]}, {"wifi"})
-        self.assertNotIn("domain_breakdown", data)  # added by T23, never faked
+        self.assertEqual(data["domain_breakdown"], [])  # no members yet: an empty list, never made-up counts
         self.assertEqual(data["seat_counts"], {"total": 0, "empty": 0, "reserved": 0, "occupied": 0})
         self.assertNotIn("owner", data)
         self.assertNotIn("is_published", data)

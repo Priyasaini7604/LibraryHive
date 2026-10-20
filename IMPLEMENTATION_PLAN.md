@@ -158,7 +158,7 @@ frontend scope is built and its tests pass; T15 to T26 are committed locally (no
 | T20 attendance | Done | Includes auto-close and closing the open record on archival |
 | T21 complaints | Done except the photo (CMP-06, P1) | Photo needs private object storage |
 | T22 visits | Done | Backend and screens |
-| T23 analytics, dashboards, exports | Done | `domain_breakdown` on the public #15 is **not** added (owner dashboard has it) |
+| T23 analytics, dashboards, exports | Done | `domain_breakdown` on the public #15 added (2026-10-20): the same `memberships.selectors.domain_breakdown` as the owner dashboard, counts only, and the library page shows it as "Who studies here" |
 | T24 scheduled jobs and email | Done | `run_scheduled_jobs`, fallback trigger #4 |
 | T25 operations screens | Done | |
 | T26 integration | Partly | `seed_demo`, an end-to-end API journey test, a role matrix over every route and a live smoke run through the frontend proxy are done; Playwright suite and a full SECURITY section 20 run are **not** done |
@@ -344,7 +344,7 @@ The application code from before the approved design is **retired, not reconcile
 - **Backend:** `apps/analytics/selectors.py` (owner dashboard, student dashboard, domain breakdown, occupancy, revenue, complaints), CSV writers; APIs #82–#89; adds `domain_breakdown` to #15 (coordinated PR with P2).
 - **Dependencies:** T15, T20, T21, T22.
 - **Tests:** each dashboard number equals its list's count (two libraries present); revenue counts successful payments only; CSV injection escaping; exports scoped to the library; audit-log view scoped and without IP.
-- **Implementation notes (2026-10-19):** `apps/analytics/` has no models. `selectors.py` composes figures only from the owning apps' selectors, so each dashboard number comes from the same query as its list (a test asserts the equality with two libraries present). APIs **#82-#89**: dashboards, occupancy, revenue (successful payments only, at most 366 days), complaint and domain reports, the CSV exports (streamed, `text/csv`, formula-injection escaping of `= + - @`, tab and CR, throttled with the `export` scope, audited) and the library-scoped activity log (no IP address). Revenue months use the Asia/Kolkata date. **Not done:** `domain_breakdown` on the public #15 (the owner dashboard has it).
+- **Implementation notes (2026-10-19):** `apps/analytics/` has no models. `selectors.py` composes figures only from the owning apps' selectors, so each dashboard number comes from the same query as its list (a test asserts the equality with two libraries present). APIs **#82-#89**: dashboards, occupancy, revenue (successful payments only, at most 366 days), complaint and domain reports, the CSV exports (streamed, `text/csv`, formula-injection escaping of `= + - @`, tab and CR, throttled with the `export` scope, audited) and the library-scoped activity log (no IP address). Revenue months use the Asia/Kolkata date. **Done later (2026-10-20):** `domain_breakdown` on the public #15, reusing the owner dashboard's selector.
 
 #### T24 Scheduled jobs and email delivery · P4 · M · `feature/scheduled-jobs`
 - **Backend:** `run_scheduled_jobs` command (orchestrator, `--only`, `--dry-run`, non-zero exit on failure), steps `renewal_notifications`, `owner_summaries`, `send_emails` (backoff, attempts), wiring of P2's `expire_holds`, P3's `reconcile_payments`, P4's `auto_close_attendance`; API #4 (job trigger, disabled unless the token is set).

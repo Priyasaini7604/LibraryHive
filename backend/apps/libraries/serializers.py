@@ -208,6 +208,7 @@ class PublicLibraryDetailSerializer(_Coordinates):
         counts = selectors.seat_counts_by_library([instance.pk])
         if counts is not None:
             data["seat_counts"] = counts.get(instance.pk, {"total": 0, "empty": 0, "reserved": 0, "occupied": 0})
+        data["domain_breakdown"] = selectors.domain_breakdown(instance)
         return data
 
 

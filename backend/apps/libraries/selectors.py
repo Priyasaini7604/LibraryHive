@@ -42,6 +42,15 @@ def seat_counts_available() -> bool:
     return _seat_counts_provider() is not None
 
 
+def domain_breakdown(library: Library) -> list[dict]:
+    """[{code, name, count}] of current members per exam domain (#15). Counts only, never identities.
+
+    Read through `memberships.selectors`, the same query as the owner dashboard (BACKEND_ARCHITECTURE section 3),
+    so the public and owner figures cannot disagree. A library without members gets an empty list.
+    """
+    return import_module("apps.memberships.selectors").domain_breakdown(library)
+
+
 def plan_in_use(plan: PricingPlan) -> bool:
     """True if any row (membership, payment, hold ...) references this plan.
 

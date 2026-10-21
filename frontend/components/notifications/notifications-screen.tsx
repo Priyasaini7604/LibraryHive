@@ -27,6 +27,7 @@ export function notificationTarget(notification: AppNotification, role: Role): s
     if (type === "payment") return `/student/payments/${id}`;
     if (type === "complaint") return `/student/complaints/${id}`;
     if (type === "visit") return "/student/visits";
+    if (type === "library") return `/libraries/${id}`;
     return null;
   }
   if (type === "membership") return `/owner/members/${id}`;

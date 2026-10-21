@@ -147,10 +147,10 @@ frontend scope is built and its tests pass; T15 to T26 are committed locally (no
 | T08, T09 libraries, photos | Done | |
 | T10 seats | Done | Seat status derived, never stored |
 | T11 membership model | Done | |
-| T12 seat holds | Done | Owner-release notification is a **pending decision** (below) |
+| T12 seat holds | Done | Owner-release notification (`hold_released`) added 2026-10-20, decision recorded below |
 | T13 notifications engine | Done | |
 | T14 payments | Done, committed (`c5a476c`) | Real Razorpay test payment is **pending credentials** (below) |
-| T15 admission, renewal, archival | Done, uncommitted | Archive notification is a **pending decision** |
+| T15 admission, renewal, archival | Done | Archive notification (`membership_archived`) added 2026-10-20 |
 | T16 public screens and seat map | Done except the map/geocoding extras | Seat map and booking panel built; `LibraryMap`, `LocationPicker`, `lib/geocode.ts` not built (Leaflet not installed; geocoding needs decision U2) |
 | T17 owner onboarding, settings, seat manager | Done | Onboarding is five steps (profile, plans, photos, seats, live) |
 | T18 checkout and renewal | Done | Automated against a mocked payment window; manual Razorpay staging check **pending** |
@@ -165,8 +165,8 @@ frontend scope is built and its tests pass; T15 to T26 are committed locally (no
 
 ### Open decisions and external blockers
 
-1. **Owner-release notification (T12).** SPEC 3.13 lists no notification type and SPEC 4.5 no dedup key for it. Not implemented, nothing invented. Needs a SPEC-backed type name, recipient and key.
-2. **Archive notification (T15, #52 says the student is notified).** Same gap in SPEC 3.13 / 4.5. The archive itself, the audit entry and the closing of an open attendance record are done; the notification is not sent.
+1. **Owner-release notification (T12): decided 2026-10-20 and built.** Type `hold_released`, sent to the student only when the owner releases that student's booking hold (#37), key `hold:{hold_id}:released:{recipient_id}`, deep link to the library page. A manual hold or the student's own cancel sends nothing. SPEC 3.13 and 4.5 updated.
+2. **Archive notification (T15, #52): decided 2026-10-20 and built.** Type `membership_archived`, sent to the student only (no owner notification in the first release), key `membership:{membership_id}:archived:{recipient_id}`, deep link to the membership. The owner's reason is never put in the message. SPEC 3.13 and 4.5 updated.
 3. **Real Razorpay test-mode payment (T14, T18): partly verified.** Keys are configured. `python manage.py check_razorpay` ran against Razorpay's real API on 2026-10-19: valid test keys, a real 1-rupee order created and read back, and our signature code agreeing with the configured secrets. Our own `create_order` path was also run once against the real API (a real order, a forged checkout refused, nothing captured). **Still not verified:** paying in the real checkout window, and Razorpay delivering a webhook. Original note: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are not set in `backend/.env`. Every automated check uses the fake gateway; none of them proves the real integration. Procedure: set the three values in `backend/.env`, expose `/api/v1/payments/webhook/razorpay/` (for example with a tunnel), subscribe the Razorpay test webhook to `payment.captured`, `order.paid` and `payment.failed`, then pay one order with a test card and one with UPI, a failed card, and a dismissed window.
 4. **T06 and T07 were merged into this branch locally** (2026-10-19, with the project lead's authorisation). Nothing is pushed; the pull requests for T06 and T07 are separate.
 5. **Complaint photo (CMP-06, P1)** needs private object storage; not built.

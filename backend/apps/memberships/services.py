@@ -16,6 +16,7 @@ from apps.core import audit
 from apps.core.dates import business_today
 from apps.core.exceptions import Conflict, NotFound, ValidationFailed
 from apps.libraries.models import PricingPlan
+from apps.notifications import services as notifications
 
 from . import selectors
 from .models import Membership
@@ -317,8 +318,8 @@ def archive_membership(*, library, owner, membership_id, reason: str) -> Members
     """End a membership and free its seat; payments and history are untouched (#52, MEM-06, SPEC.md 4.4).
 
     Locks Seat then Membership. The seat stays on the row as history. An open attendance record of the student
-    at this library is closed in the same transaction. Telling the student needs a notification type that
-    SPEC.md 3.13 does not list (a pending decision).
+    at this library is closed in the same transaction, and the student is notified (`membership_archived`,
+    SPEC.md 3.13 and 4.5). The owner is not notified and the owner's reason is never put in the message.
     """
     seat_id = Membership.objects.filter(pk=membership_id, library=library).values_list("seat_id", flat=True).first()
     if seat_id is None:
@@ -340,6 +341,17 @@ def archive_membership(*, library, owner, membership_id, reason: str) -> Members
         library=library,
         changes={"seat": membership.seat.label},
         reason=membership.archive_reason,
+    )
+    notifications.notify(
+        recipient=membership.student,
+        type="membership_archived",
+        title="Your membership has ended",
+        body=(
+            f"{library.name} has ended your membership. Seat {membership.seat.label} is now free. "
+            "Please contact the library if you think this is a mistake."
+        ),
+        dedup_key=f"membership:{membership.pk}:archived:{membership.student_id}",
+        entity=("membership", membership.pk),
     )
     logger.info("Membership archived", extra={"membership_id": str(membership.pk), "owner_id": str(owner.pk)})
     return membership

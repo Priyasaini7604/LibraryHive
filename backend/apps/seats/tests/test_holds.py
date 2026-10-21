@@ -17,6 +17,7 @@ from apps.libraries.models import Library
 from apps.libraries.tests.base import make_library, make_plan
 from apps.memberships.models import Membership
 from apps.memberships.tests.test_membership_model import make_membership
+from apps.notifications.models import Notification
 from apps.seats import selectors, services
 from apps.seats.models import Seat, SeatHold
 
@@ -415,6 +416,46 @@ class ReleaseHoldTests(HoldTestCase):
         hold.refresh_from_db()
         self.assertEqual(hold.status, "released")
         self.assertEqual(hold.reason, "Reserved")  # the placement reason is kept; the release reason is audited
+
+    def test_the_student_is_told_once_and_the_owner_reason_stays_private(self):
+        hold = self.make_hold()
+        self.owner.post(self.url(hold), {"reason": "Internal: suspected fraud"}, format="json")
+        note = Notification.objects.get(recipient=self.student, type="hold_released")
+        self.assertEqual(note.dedup_key, f"hold:{hold.pk}:released:{self.student.pk}")
+        self.assertEqual((note.entity_type, note.entity_id), ("library", self.library.pk))
+        self.assertIn(self.seat.label, note.body)
+        self.assertNotIn("fraud", note.title + note.body)
+        # Nobody else is told, and a second release (409) adds nothing.
+        self.assertEqual(Notification.objects.count(), 1)
+        self.assertEqual(self.owner.post(self.url(hold), {"reason": "Again please"}, format="json").status_code, 409)
+        self.assertEqual(Notification.objects.filter(type="hold_released").count(), 1)
+
+    def test_replaying_the_same_release_key_creates_no_second_notification(self):
+        hold = self.make_hold()
+        services.release_hold(library=self.library, hold=hold, actor=self.library.owner, reason="First")
+        from apps.notifications import services as notifications
+
+        again = notifications.notify(
+            recipient=self.student,
+            type="hold_released",
+            title="x",
+            body="y",
+            dedup_key=f"hold:{hold.pk}:released:{self.student.pk}",
+        )
+        self.assertIsNone(again)
+        self.assertEqual(Notification.objects.filter(type="hold_released").count(), 1)
+
+    def test_a_manual_hold_has_nobody_to_tell(self):
+        hold = services.place_manual_hold(
+            library=self.library, seat_id=self.seat.pk, actor=self.library.owner, reason="Reserved"
+        )
+        self.owner.post(self.url(hold), {"reason": "No longer needed"}, format="json")
+        self.assertFalse(Notification.objects.exists())
+
+    def test_cancelling_your_own_hold_sends_no_release_notification(self):
+        hold = self.make_hold()
+        client_for(self.student).post(f"/api/v1/student/holds/{hold.pk}/cancel/", format="json")
+        self.assertFalse(Notification.objects.filter(type="hold_released").exists())
 
     def test_only_pending_holds_can_be_released(self):
         for status in ("released", "cancelled", "expired"):

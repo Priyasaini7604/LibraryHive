@@ -28,5 +28,15 @@ export default defineConfig([
     files: ["lib/api-client.ts", "lib/geocode.ts", "tests/**"],
     rules: { "no-restricted-syntax": "off" },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "coverage/**", "next-env.d.ts", "lib/api-types.gen.ts"]),
+  globalIgnores([
+    ".next/**",
+    ".next-e2e/**",
+    "out/**",
+    "build/**",
+    "coverage/**",
+    "playwright-report/**",
+    "test-results/**",
+    "next-env.d.ts",
+    "lib/api-types.gen.ts",
+  ]),
 ]);

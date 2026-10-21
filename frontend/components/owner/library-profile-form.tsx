@@ -4,12 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LocateFixed } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input, Textarea } from "@/components/ui/input";
+import { LocationPicker } from "@/components/library/location-picker";
 import { Alert } from "@/components/ui/surface";
 import { createLibrary, fetchAmenities, fetchDomains, updateLibrary, type LibraryInput } from "@/lib/api/libraries";
 import { useAuth } from "@/lib/auth-context";
@@ -159,6 +160,9 @@ export function LibraryProfileForm({ library }: { library: OwnerLibrary | null }
     onError: (error) => setFormError(applyServerError(error, setError, FIELDS, { LIBRARY_EXISTS: "name" })),
   });
 
+  const latitude = useWatch({ control, name: "latitude" });
+  const longitude = useWatch({ control, name: "longitude" });
+
   const useMyLocation = () => {
     if (!("geolocation" in navigator)) {
       setLocationMessage("Your browser can't share its location. Enter the coordinates by hand.");
@@ -217,6 +221,14 @@ export function LibraryProfileForm({ library }: { library: OwnerLibrary | null }
       <fieldset className="flex flex-col gap-3">
         <legend className="text-sm font-medium text-slate-900">Location</legend>
         <p className="text-sm text-slate-600">Students find you by location, and your library cannot go live without it.</p>
+        <LocationPicker
+          latitude={latitude}
+          longitude={longitude}
+          onChange={(lat, lng) => {
+            setValue("latitude", lat, { shouldDirty: true, shouldValidate: true });
+            setValue("longitude", lng, { shouldDirty: true, shouldValidate: true });
+          }}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Latitude" error={errors.latitude?.message}>
             <Input inputMode="decimal" {...register("latitude")} />

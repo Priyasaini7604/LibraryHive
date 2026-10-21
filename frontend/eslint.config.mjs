@@ -25,7 +25,7 @@ export default defineConfig([
   },
   {
     // The API client and its tests are the only places allowed to call fetch().
-    files: ["lib/api-client.ts", "tests/**"],
+    files: ["lib/api-client.ts", "lib/geocode.ts", "tests/**"],
     rules: { "no-restricted-syntax": "off" },
   },
   globalIgnores([

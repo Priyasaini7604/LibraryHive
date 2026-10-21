@@ -220,6 +220,7 @@ Each app's `tests/test_isolation.py` builds Library A and Library B, Owner A and
 | Safe rendering | React escaping only. External links use `rel="noopener noreferrer"`. User-supplied URLs are never rendered as links. |
 | Third parties | Only Razorpay Checkout, OpenStreetMap tiles and Nominatim (UI §9.5). No analytics or tracking scripts in the MVP. Adding any later requires a CSP and privacy review. |
 | Geocoding privacy (U2 revisited) | The area text a user types is sent from the browser to Nominatim (with the user's IP). Accepted for the MVP because it is an area name, sent only on explicit search, and never combined with account data. **It must be disclosed in the Privacy Policy** `[PRE-LAUNCH REQUIREMENT]`. Moving the call behind the backend is an option if this is unacceptable. |
+| Map tile privacy (pilot: OpenStreetMap tiles) | Every map tile request tells the tile host the visitor's IP address and the area being viewed. The map loads only on the library page and in the owner's location picker, from the host set in `NEXT_PUBLIC_MAP_TILE_URL` (default `tile.openstreetmap.org`); its origin is added to the CSP `img-src` and nothing else is. The OpenStreetMap attribution is always visible. **It must be disclosed in the Privacy Policy** `[PRE-LAUNCH REQUIREMENT]`, and the provider is re-decided before public launch (`docs/MAP_TILE_PROVIDER_PROPOSAL.md`). |
 
 ---
 
@@ -417,7 +418,7 @@ Forged checkout signature; signature computed with the wrong secret; valid signa
 | ID | Item | Status |
 |---|---|---|
 | L1 | **Terms of Service** (student and owner use, booking and hold rules, owner responsibilities for member data, acceptable use) | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |
-| L2 | **Privacy Policy** (inventory in §17.1, third parties, retention, rights and requests, offline-admission data) | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |
+| L2 | **Privacy Policy** (inventory in §17.1, third parties including the map tile host and Nominatim, retention, rights and requests, offline-admission data) | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |
 | L3 | **Contact information**, including support email, a grievance or data-protection contact, and the business identity shown on the site | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |
 | L4 | **Refund and cancellation policy** (covers `needs_refund` cases and manual refunds). Payment gateways commonly ask for refund, terms, privacy and contact pages during merchant activation; confirm Razorpay's exact requirements during KYC. | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |
 | L5 | Data-protection compliance review (§17.2) | `[DECISION REQUIRED]` `[PRE-LAUNCH REQUIREMENT]` |

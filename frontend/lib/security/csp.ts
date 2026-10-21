@@ -1,3 +1,5 @@
+import { tileOrigin } from "@/lib/map-config";
+
 /**
  * Content-Security-Policy builder (SECURITY.md section 8).
  *
@@ -11,6 +13,8 @@ export interface CspOptions {
   nonce: string;
   apiUrl: string;
   mediaOrigin?: string;
+  /** Tile template of a non-default map provider (`NEXT_PUBLIC_MAP_TILE_URL`); its origin is allowed for images. */
+  mapTileUrl?: string;
   isDev: boolean;
 }
 
@@ -23,9 +27,11 @@ function originOf(url: string | undefined): string | null {
   }
 }
 
-export function buildCsp({ nonce, apiUrl, mediaOrigin, isDev }: CspOptions): string {
+export function buildCsp({ nonce, apiUrl, mediaOrigin, mapTileUrl, isDev }: CspOptions): string {
   const api = originOf(apiUrl);
   const media = originOf(mediaOrigin);
+  // Only a template that passes the same validation the map uses may add a source; anything else adds nothing.
+  const tiles = tileOrigin(mapTileUrl);
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -37,7 +43,16 @@ export function buildCsp({ nonce, apiUrl, mediaOrigin, isDev }: CspOptions): str
     ],
     // Tailwind output is a stylesheet; Radix and Leaflet set inline styles at runtime.
     "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "blob:", ...(media ? [media] : []), "https://*.tile.openstreetmap.org"],
+    "img-src": [
+      "'self'",
+      "data:",
+      "blob:",
+      ...(media ? [media] : []),
+      // OpenStreetMap now serves tiles from the bare host; the wildcard covers the older a/b/c subdomains.
+      "https://tile.openstreetmap.org",
+      "https://*.tile.openstreetmap.org",
+      ...(tiles ? [tiles] : []),
+    ],
     "font-src": ["'self'"],
     "connect-src": [
       "'self'",

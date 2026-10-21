@@ -611,7 +611,7 @@ Every UI-facing P0/P1 feature in `FEATURES.md` has a screen above. Features with
 | ID | Decision | Default applied |
 |---|---|---|
 | U1 | UI primitives | Radix primitives wrapped in our own Tailwind kit (not a full UI framework) + `sonner` for toasts |
-| U2 | "Searched area" geocoding (FR-03) needs a geocoder; none exists in the API | Nominatim (OpenStreetMap) called from the browser, on submit only, with a text-search fallback. Re-evaluated in Phase 6 (privacy) and Phase 10 (limits, possible paid provider). |
+| U2 | "Searched area" geocoding (FR-03) needs a geocoder; none exists in the API | Nominatim (OpenStreetMap) called from the browser, on submit only, with a text-search fallback. Re-evaluated in Phase 6 (privacy) and Phase 10 (limits, possible paid provider). Built 2026-10-20: `lib/geocode.ts` (submit only, one request per second, cached), `LocationPicker`, and a single-pin `LibraryMap` on the library page. Tiles come from `NEXT_PUBLIC_MAP_TILE_URL` (default OpenStreetMap) with the attribution always shown. A discover-page map needs coordinates in #14, which the contract does not include yet (pending decision). |
 | U3 | Landing page at `/` | Minimal landing replaces the redirect |
 | U4 | Dark mode | Not in the MVP (P2) |
 | U5 | Language | English only (P2: Hindi) |

@@ -9,6 +9,7 @@ export function proxy(request: NextRequest) {
     nonce,
     apiUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1",
     mediaOrigin: process.env.MEDIA_ORIGIN,
+    mapTileUrl: process.env.NEXT_PUBLIC_MAP_TILE_URL,
     isDev: process.env.NODE_ENV === "development",
   });
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { BookingPanel } from "@/components/library/booking-panel";
 import { DomainBars } from "@/components/charts/bars";
 import { RequestVisitButton } from "@/components/visits/request-visit-dialog";
+import { LibraryMap } from "@/components/library/library-map";
 import { PhotoGallery } from "@/components/library/photo-gallery";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
@@ -192,6 +193,8 @@ export function LibraryPage({ id }: { id: string }) {
           <DomainBars rows={library.domain_breakdown} />
         )}
       </section>
+
+      <LibraryMap latitude={library.latitude} longitude={library.longitude} name={library.name} />
     </div>
   );
 }

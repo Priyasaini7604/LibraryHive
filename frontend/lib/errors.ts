@@ -85,6 +85,8 @@ const GENERIC_MESSAGE = "Something went wrong on our side.";
 /** The message to show a user for any thrown value. */
 export function userMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    // A generic 409 carries a sentence the backend wrote for the user (e.g. "Library owners cannot be admitted as students.").
+    if (error.code === "CONFLICT" && error.message) return error.message;
     const friendly = FRIENDLY_MESSAGES[error.code] ?? GENERIC_MESSAGE;
     const isUnexpected = !(error.code in FRIENDLY_MESSAGES) || error.code === "SERVER_ERROR";
     return isUnexpected && error.requestId ? `${friendly} Reference: ${error.requestId}` : friendly;

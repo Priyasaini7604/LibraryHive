@@ -16,6 +16,21 @@ describe("userMessage", () => {
     expect(userMessage(error)).toBe("Something went wrong on our side. Reference: abc123");
   });
 
+  it("shows the API's own sentence for a generic conflict", () => {
+    const error = new ApiError({
+      status: 409,
+      code: "CONFLICT",
+      message: "Library owners cannot be admitted as students.",
+      requestId: "abc123",
+    });
+    expect(userMessage(error)).toBe("Library owners cannot be admitted as students.");
+  });
+
+  it("keeps hiding the message of an unmapped code", () => {
+    const error = new ApiError({ status: 409, code: "SOMETHING_NEW", message: "internal detail", requestId: "abc123" });
+    expect(userMessage(error)).toBe("Something went wrong on our side. Reference: abc123");
+  });
+
   it("never shows raw messages for unknown errors", () => {
     expect(userMessage(new Error("stack trace with secrets"))).toBe("Something went wrong on our side.");
   });

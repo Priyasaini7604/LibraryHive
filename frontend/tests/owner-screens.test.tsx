@@ -195,6 +195,29 @@ describe("AdmissionScreen", () => {
     expect(screen.getByRole("button", { name: "Admit student and record payment" })).toBeDisabled();
   });
 
+  it("says why an owner account cannot be admitted instead of a generic error", async () => {
+    const message = "Library owners cannot be admitted as students.";
+    mocks.lookupAdmission.mockRejectedValue(new ApiError({ status: 409, code: "CONFLICT", message, requestId: "r1" }));
+    renderWithClient(<AdmissionScreen />);
+    await fillIdentity();
+    await userEvent.click(screen.getByRole("button", { name: /Check if they already have an account/ }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Admit student and record payment" })).toBeDisabled();
+  });
+
+  it("shows the reason when the server refuses the admission with a conflict", async () => {
+    const message = "Library owners cannot be admitted as students.";
+    mocks.admitStudent.mockRejectedValue(new ApiError({ status: 409, code: "CONFLICT", message, requestId: "r1" }));
+    renderWithClient(<AdmissionScreen />);
+    await fillIdentity();
+    await choose(/Seat/, "A-1");
+    await choose(/Plan/, /Monthly/);
+    await userEvent.click(screen.getByRole("button", { name: "Admit student and record payment" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText(/went wrong/i)).not.toBeInTheDocument();
+  });
+
   it("validates before sending anything", async () => {
     renderWithClient(<AdmissionScreen />);
     await userEvent.click(await screen.findByRole("button", { name: "Admit student and record payment" }));

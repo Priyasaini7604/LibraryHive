@@ -47,11 +47,13 @@ describe("ClaimCodeDialog", () => {
   });
 
   it("explains why a code can't be issued", async () => {
-    mocks.issueClaimCode.mockRejectedValue(new ApiError({ status: 409, code: "CONFLICT", message: "x" }));
+    mocks.issueClaimCode.mockRejectedValue(
+      new ApiError({ status: 409, code: "CONFLICT", message: "This student has already claimed their account." }),
+    );
     renderDialog();
     await userEvent.click(await screen.findByRole("button", { name: "Create a claim code" }));
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/went wrong/i);
+    expect(alert).toHaveTextContent("This student has already claimed their account.");
     expect(screen.queryByLabelText("Claim code")).not.toBeInTheDocument();
   });
 

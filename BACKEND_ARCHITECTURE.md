@@ -589,7 +589,20 @@ The free-tier deployment (Render Free, Neon Free, Vercel Hobby) has no cron, so 
 
 Both avoid the top of the hour, when GitHub's queue is busiest. A forgotten check-out blocks the student's next check-in (one open record per student), so attendance runs hourly; a record is still closed at the library's closing time, not at run time, so a late run keeps the history correct. `reconcile_payments` (online payments are off), `expire_holds` (hold expiry is derived on every read) and `send_emails` (no provider) are deliberately not scheduled. All dates are Asia/Kolkata business dates (`apps.core.dates.business_today`).
 
-**Repository secrets** (Settings, Secrets and variables, Actions; an admin must add them). Never put them in a workflow file, a log or a pull request. Note on branches: the `main`-only `if:` in the workflow stops accidental runs from other branches, but it lives in the workflow file, so it cannot stop someone with write access who pushes a branch with an *edited* copy of that file; repository-level secrets are available to every branch. The real control, if that matters, is storing the secrets as **Environment** secrets for an environment limited to the `main` branch (Settings, Environments) and adding `environment:` to the job, instead of repository secrets. That is an optional hardening step and changes where the secrets are added:
+**Secrets live in the GitHub Environment `staging`, not in the repository secrets.** The `run` job declares `environment: staging`; only a job that names that environment can read its secrets, and the environment is limited to the `main` branch, so a branch with an *edited* copy of the workflow file cannot use them (GitHub refuses the environment to any other branch). Never put the values in a workflow file, a log or a pull request.
+
+**What Priya (repository admin) must do once** (needs the admin role; the repository is `Priyasaini7604/LibraryHive`):
+
+1. Settings, Environments, **New environment**, name it exactly `staging`.
+2. In that environment, under **Deployment branches and tags**, choose **Selected branches and tags**, then **Add deployment branch or tag rule** and add the branch name `main` (type: Branch). Nothing else.
+3. Leave **Required reviewers** and **Wait timer** off. With either, every scheduled run would stop and wait for a person.
+4. Under **Environment secrets**, **Add environment secret** three times: `DATABASE_URL`, `SECRET_KEY`, `JWT_SIGNING_KEY` (values below).
+5. Do **not** add these names as repository secrets (Settings, Secrets and variables, Actions). If any exist there, delete them: a repository secret is readable from every branch, which is exactly the gap the environment closes.
+6. Recommended: protect `main` (Settings, Rules, require a pull request and a review before merging), so the workflow file on `main` cannot be changed without review. The environment rule protects the secrets from other branches; only review protects `main` itself.
+
+Every run appears under the repository's **Deployments** as a deployment to `staging` (about 750 a month). That is expected; nothing is deployed. Environment secrets are available to a job only through `secrets.*` after the branch rule passes, and are not passed to workflows triggered from forks. This workflow has no `pull_request` trigger and refuses to run outside `Priyasaini7604/LibraryHive`, so a fork never runs it.
+
+**Acceptance check after setup** (do it once, after the workflow is merged and the secrets exist): run the workflow manually from `main`, job `daily`, dry run ticked, and expect green. Then start it from any other branch and expect a red run from the `wrong-branch` job that used no secret. To prove the branch rule itself, a throwaway branch whose copy of the file removes the `if:` guard must be refused at the environment step ("Branch is not allowed to deploy to staging"); delete the branch afterwards.
 
 | Secret | Value |
 |---|---|

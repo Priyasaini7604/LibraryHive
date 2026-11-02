@@ -6,6 +6,12 @@
 # here is real time. Scheduled runs happen only on the default branch, fork pull requests never receive the secrets,
 # and the job itself refuses to run from any other branch (see `if:` below).
 #
+# The three secrets (DATABASE_URL, SECRET_KEY, JWT_SIGNING_KEY) are secrets of the GitHub Environment `staging`, which
+# must be limited to the `main` branch (Settings > Environments > staging). Only a job that names that environment can
+# read them, and GitHub refuses the environment to any other branch, so an edited copy of this file on a feature
+# branch cannot use them. Do NOT also add them as repository secrets, and do not add required reviewers or a wait
+# timer to the environment (each scheduled run would then wait for approval). Setup: BACKEND_ARCHITECTURE.md 11.4.
+#
 # Not scheduled on purpose: `reconcile_payments` (online payments are off), `expire_holds` (hold expiry is derived on
 # every read) and `send_emails` (no email provider yet). Do not also run these jobs from Render.
 #
@@ -65,6 +71,9 @@ jobs:
 
   run:
     name: Run scheduled job
+    # The environment is what makes the secrets available (and only to `main`). Every run is recorded as a deployment
+    # to `staging` in the repository's Deployments list; that is expected and nothing is actually deployed.
+    environment: staging
     # Only in the main repository, and only from the main branch: forks have no secrets and must not run against
     # anyone's database, and a manual run from a feature branch must not use the secrets.
     if: github.repository == 'Priyasaini7604/LibraryHive' && github.ref == 'refs/heads/main'
@@ -114,7 +123,7 @@ jobs:
 
       - name: Check the secrets are set
         env:
-          # Repository secrets (Settings > Secrets and variables > Actions). Never echoed.
+          # Secrets of the `staging` environment (Settings > Environments > staging). Never echoed.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
@@ -124,7 +133,7 @@ jobs:
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing. See BACKEND_ARCHITECTURE.md section 11."
+            echo "::error::Missing secret(s):$missing. Add them as secrets of the 'staging' environment (Settings > Environments > staging), not as repository secrets. See BACKEND_ARCHITECTURE.md section 11.4."
             exit 1
           fi
 
@@ -160,7 +169,7 @@ jobs:
       - name: Check the database schema is up to date (read-only)
         # Fails loudly if migrations have not been applied; it never changes the database.
         env:
-          # Repository secrets (Settings > Secrets and variables > Actions). Never echoed.
+          # Secrets of the `staging` environment (Settings > Environments > staging). Never echoed.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
@@ -169,7 +178,7 @@ jobs:
       - name: Run the job
         env:
           ARGS: ${{ steps.job.outputs.args }}
-          # Repository secrets (Settings > Secrets and variables > Actions). Never echoed.
+          # Secrets of the `staging` environment (Settings > Environments > staging). Never echoed.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}

@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
   fetchOwnerVisits: vi.fn(),
   decideVisit: vi.fn(),
   fetchNotifications: vi.fn(),
+  fetchNotificationChannels: vi.fn(),
   fetchUnreadCount: vi.fn(),
   markNotificationRead: vi.fn(),
   markAllNotificationsRead: vi.fn(),
@@ -84,6 +85,7 @@ vi.mock("@/lib/api/operations", () => ({
   fetchOwnerVisits: mocks.fetchOwnerVisits,
   decideVisit: mocks.decideVisit,
   fetchNotifications: mocks.fetchNotifications,
+  fetchNotificationChannels: mocks.fetchNotificationChannels,
   fetchUnreadCount: mocks.fetchUnreadCount,
   markNotificationRead: mocks.markNotificationRead,
   markAllNotificationsRead: mocks.markAllNotificationsRead,
@@ -415,6 +417,42 @@ describe("notifications", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "Show unread only" }));
     await waitFor(() => expect(mocks.fetchNotifications).toHaveBeenLastCalledWith(expect.objectContaining({ unread: true })));
     expect(await screen.findByText("Nothing unread")).toBeInTheDocument();
+  });
+
+  it("tells an owner that email delivery is off, and that reminders are in the app only", async () => {
+    mocks.fetchNotifications.mockResolvedValue(page([]));
+    mocks.fetchNotificationChannels.mockResolvedValue({ in_app: true, email: false });
+    renderWithClient(<NotificationsScreen viewer="owner" />);
+    expect(await screen.findByText("Email delivery is currently turned off")).toBeInTheDocument();
+    expect(screen.getByText(/appear here, in the app, only/)).toBeInTheDocument();
+    expect(screen.queryByText(/email was sent/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no email notice when email delivery is really on", async () => {
+    mocks.fetchNotifications.mockResolvedValue(page([]));
+    mocks.fetchNotificationChannels.mockResolvedValue({ in_app: true, email: true });
+    renderWithClient(<NotificationsScreen viewer="owner" />);
+    expect(await screen.findByText("No notifications yet")).toBeInTheDocument();
+    await waitFor(() => expect(mocks.fetchNotificationChannels).toHaveBeenCalled());
+    expect(screen.queryByText("Email delivery is currently turned off")).not.toBeInTheDocument();
+  });
+
+  it("shows no email notice if the status cannot be read (it never guesses)", async () => {
+    mocks.fetchNotifications.mockResolvedValue(page([]));
+    mocks.fetchNotificationChannels.mockRejectedValue(new ApiError({ status: 500, code: "SERVER_ERROR", message: "x" }));
+    renderWithClient(<NotificationsScreen viewer="owner" />);
+    expect(await screen.findByText("No notifications yet")).toBeInTheDocument();
+    await waitFor(() => expect(mocks.fetchNotificationChannels).toHaveBeenCalled());
+    expect(screen.queryByText("Email delivery is currently turned off")).not.toBeInTheDocument();
+  });
+
+  it("does not show the owner email notice to students", async () => {
+    mocks.fetchNotifications.mockResolvedValue(page([]));
+    mocks.fetchNotificationChannels.mockResolvedValue({ in_app: true, email: false });
+    renderWithClient(<NotificationsScreen viewer="student" />);
+    expect(await screen.findByText("No notifications yet")).toBeInTheDocument();
+    expect(mocks.fetchNotificationChannels).not.toHaveBeenCalled();
+    expect(screen.queryByText("Email delivery is currently turned off")).not.toBeInTheDocument();
   });
 
   it("shows the unread count on the bell", async () => {

@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/choice";
 import { Pagination } from "@/components/ui/navigation";
 import { LoadingList, Page, PageHeader } from "@/components/ui/page";
 import { EmptyState, ErrorState } from "@/components/ui/states";
+import { Alert } from "@/components/ui/surface";
 import { cn } from "@/lib/cn";
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api/operations";
+import { fetchNotificationChannels, fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api/operations";
 import { userMessage } from "@/lib/errors";
 import { formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
@@ -36,6 +37,22 @@ export function notificationTarget(notification: AppNotification, role: Role): s
   if (type === "visit") return "/owner/visits";
   if (type === "library") return "/owner/dues";
   return null;
+}
+
+/**
+ * Tells an owner when email is not being delivered, so a notification in the inbox is never mistaken for an email
+ * that was sent. The answer comes from the server (a provider must be configured and switched on). While it loads,
+ * or if it cannot be read, nothing is shown: the notice never claims anything it has not confirmed.
+ */
+function EmailDeliveryNotice() {
+  const channels = useQuery({ queryKey: queryKeys.notificationChannels, queryFn: fetchNotificationChannels, staleTime: 5 * 60_000 });
+  if (!channels.data || channels.data.email) return null;
+  return (
+    <Alert tone="info" title="Email delivery is currently turned off">
+      Reminders and daily summaries appear here, in the app, only. No email is sent yet, so students who do not open the app will not
+      see their reminders. Use the Dues page to follow up with members who are due or overdue.
+    </Alert>
+  );
 }
 
 /** `/student/notifications` and `/owner/notifications`: the in-app inbox (#58-#61). */
@@ -68,6 +85,7 @@ export function NotificationsScreen({ viewer }: { viewer: Role }) {
           </Button>
         }
       />
+      {viewer === "owner" && <EmailDeliveryNotice />}
       <Checkbox label="Show unread only" checked={unreadOnly} onCheckedChange={(value) => { setUnreadOnly(value === true); setPage(1); }} />
 
       {query.isPending ? (

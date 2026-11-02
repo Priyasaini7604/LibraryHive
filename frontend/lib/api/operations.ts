@@ -3,6 +3,7 @@
 import { api, downloadFile } from "../api-client";
 import type {
   AppNotification,
+  NotificationChannels,
   AttendanceHistory,
   AttendanceRecord,
   AuditEntry,
@@ -131,6 +132,10 @@ export function decideVisit(id: string, input: { decision: "accept" | "reject"; 
 
 export function fetchNotifications(query: { unread?: boolean; page?: number } = {}): Promise<Page<AppNotification>> {
   return api.get<Page<AppNotification>>("/notifications/", { query: { unread: query.unread ? "true" : undefined, page: query.page } });
+}
+
+export function fetchNotificationChannels(): Promise<NotificationChannels> {
+  return api.get<NotificationChannels>("/notifications/channels/");
 }
 
 export async function fetchUnreadCount(): Promise<number> {

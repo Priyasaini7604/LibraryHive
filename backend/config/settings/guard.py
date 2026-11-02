@@ -6,6 +6,17 @@ production settings module raises ImproperlyConfigured if it returns errors.
 
 MIN_SECRET_LENGTH = 50
 
+# Email backends that never leave the machine: console prints the message, the others keep or drop it.
+# Marking a delivery `sent` through one of them would report an email that nobody received.
+NON_DELIVERING_EMAIL_BACKENDS = frozenset(
+    {
+        "django.core.mail.backends.console.EmailBackend",
+        "django.core.mail.backends.locmem.EmailBackend",
+        "django.core.mail.backends.dummy.EmailBackend",
+        "django.core.mail.backends.filebased.EmailBackend",
+    }
+)
+
 
 def unsafe_settings_errors(
     *,
@@ -16,6 +27,8 @@ def unsafe_settings_errors(
     cors_allowed_origins: list[str],
     environment: str,
     razorpay_key_id: str = "",
+    email_notifications_enabled: bool = False,
+    email_backend: str = "",
 ) -> list[str]:
     errors: list[str] = []
     if debug:
@@ -32,4 +45,9 @@ def unsafe_settings_errors(
         errors.append("CORS_ALLOWED_ORIGINS must list explicit origins (no '*').")
     if environment == "production" and razorpay_key_id.startswith("rzp_test_"):
         errors.append("Razorpay test keys must not be used when ENVIRONMENT=production.")
+    if email_notifications_enabled and email_backend in NON_DELIVERING_EMAIL_BACKENDS:
+        errors.append(
+            "EMAIL_NOTIFICATIONS_ENABLED needs a real EMAIL_BACKEND; "
+            "the console, locmem, dummy and file backends would mark emails as sent without delivering them."
+        )
     return errors

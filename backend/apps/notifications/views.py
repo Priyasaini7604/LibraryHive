@@ -8,7 +8,13 @@ from apps.core.pagination import StandardPagination
 from apps.core.responses import ok
 
 from . import selectors, services
-from .serializers import InboxQuery, NotificationSerializer, ReadAllSerializer, UnreadCountSerializer
+from .serializers import (
+    ChannelsSerializer,
+    InboxQuery,
+    NotificationSerializer,
+    ReadAllSerializer,
+    UnreadCountSerializer,
+)
 
 
 class InboxView(APIView):
@@ -35,6 +41,16 @@ class UnreadCountView(APIView):
     @extend_schema(responses={200: UnreadCountSerializer})
     def get(self, request):
         return ok({"count": selectors.unread_count(request.user)})
+
+
+class ChannelsView(APIView):
+    """Which channels really deliver: in-app always, email only when a provider is configured and switched on."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: ChannelsSerializer})
+    def get(self, request):
+        return ok({"in_app": True, "email": selectors.email_delivery_active()})
 
 
 class MarkReadView(APIView):

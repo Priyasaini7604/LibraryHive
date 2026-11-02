@@ -18,5 +18,10 @@ class UnreadCountSerializer(serializers.Serializer):
     count = serializers.IntegerField()
 
 
+class ChannelsSerializer(serializers.Serializer):
+    in_app = serializers.BooleanField()
+    email = serializers.BooleanField()
+
+
 class ReadAllSerializer(serializers.Serializer):
     updated = serializers.IntegerField()

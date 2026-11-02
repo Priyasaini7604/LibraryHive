@@ -42,4 +42,5 @@ export const queryKeys = {
 
   notifications: (filters: object) => ["notifications", "list", filters] as const,
   unreadCount: ["notifications", "unread"] as const,
+  notificationChannels: ["notifications", "channels"] as const,
 };

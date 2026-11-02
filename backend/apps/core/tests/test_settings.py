@@ -36,6 +36,23 @@ class ProductionGuardTests(SimpleTestCase):
     def test_jwt_key_must_differ_from_secret_key(self):
         self.assertTrue(unsafe_settings_errors(**{**SAFE, "jwt_signing_key": SAFE["secret_key"]}))
 
+    def test_email_notifications_need_a_backend_that_really_delivers(self):
+        console = "django.core.mail.backends.console.EmailBackend"
+        smtp = "django.core.mail.backends.smtp.EmailBackend"
+        for backend in (
+            console,
+            "django.core.mail.backends.locmem.EmailBackend",
+            "django.core.mail.backends.dummy.EmailBackend",
+            "django.core.mail.backends.filebased.EmailBackend",
+        ):
+            with self.subTest(backend=backend):
+                errors = unsafe_settings_errors(**SAFE, email_notifications_enabled=True, email_backend=backend)
+                self.assertEqual(len(errors), 1)
+                self.assertIn("EMAIL_NOTIFICATIONS_ENABLED", errors[0])
+        self.assertEqual(unsafe_settings_errors(**SAFE, email_notifications_enabled=True, email_backend=smtp), [])
+        # Switched off, any backend is fine: no delivery rows are created and nothing is marked sent.
+        self.assertEqual(unsafe_settings_errors(**SAFE, email_notifications_enabled=False, email_backend=console), [])
+
     def test_test_keys_allowed_in_staging(self):
         self.assertEqual(
             unsafe_settings_errors(**{**SAFE, "environment": "staging", "razorpay_key_id": "rzp_test_abc"}), []

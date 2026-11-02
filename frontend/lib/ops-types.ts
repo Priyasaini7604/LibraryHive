@@ -358,6 +358,12 @@ export interface AuditEntry {
   reason: string;
 }
 
+/** Which channels really deliver (`GET /notifications/channels/`). Email is true only with a configured provider. */
+export interface NotificationChannels {
+  in_app: boolean;
+  email: boolean;
+}
+
 export interface AppNotification {
   id: string;
   type: string;

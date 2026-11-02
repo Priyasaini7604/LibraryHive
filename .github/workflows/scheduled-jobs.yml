@@ -94,8 +94,11 @@ jobs:
       EMAIL_NOTIFICATIONS_ENABLED: "false"
       # The secrets are added only to the steps that need them (not to the dependency install).
     steps:
+      # The three validation steps run before `actions/checkout`, when `backend/` does not exist yet, so each one
+      # states `working-directory: .` (the workspace root) instead of inheriting the job default (`backend`) above.
       - name: Choose the job
         id: job
+        working-directory: .
         env:
           EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -122,6 +125,7 @@ jobs:
           echo "Running job '$mode' (dry run: $dry)"
 
       - name: Check the secrets are set
+        working-directory: .
         env:
           # Secrets of the `staging` environment (Settings > Environments > staging). Never echoed.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -138,6 +142,7 @@ jobs:
           fi
 
       - name: Check the database connection settings
+        working-directory: .
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |

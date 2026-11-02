@@ -111,6 +111,30 @@ class WorkflowSecurityTests(SimpleTestCase):
         self.assertIn("-offbranch", group)
         self.assertIn("-dry", group)
 
+    def test_validation_steps_before_checkout_run_from_the_workspace_root(self):
+        """Regression: before `actions/checkout` the `backend/` folder does not exist, so a `run` step that inherits
+        the job's `working-directory: backend` cannot even start (run 41486751959)."""
+        run = self.jobs["run"]
+        self.assertEqual(run["defaults"]["run"]["working-directory"], "backend")  # steps after checkout keep it
+        steps = run["steps"]
+        checkout = next(i for i, step in enumerate(steps) if str(step.get("uses", "")).startswith("actions/checkout"))
+        before = steps[:checkout]
+        names = [step.get("name") for step in before]
+        # The fail-fast validation stays ahead of checkout, in this order.
+        self.assertEqual(
+            names, ["Choose the job", "Check the secrets are set", "Check the database connection settings"]
+        )
+        for step in before:
+            if "run" in step:
+                self.assertEqual(
+                    step.get("working-directory"),
+                    ".",
+                    f"step {step['name']!r} runs before checkout and must set `working-directory: .`",
+                )
+        # Steps after checkout must not be moved out of backend/ by accident.
+        for step in steps[checkout + 1 :]:
+            self.assertNotIn("working-directory", step, f"step {step.get('name')!r} should inherit backend")
+
     def test_the_run_has_a_timeout_and_the_database_url_is_checked_without_printing_it(self):
         self.assertLessEqual(self.jobs["run"]["timeout-minutes"], 10)
         self.assertIn("sslmode=require", self.text)

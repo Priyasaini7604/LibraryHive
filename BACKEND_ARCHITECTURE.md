@@ -558,7 +558,7 @@ class PaymentGateway(Protocol):
 python manage.py run_scheduled_jobs [--only STEP] [--dry-run]
 ```
 
-Run **hourly** by the host's cron, with the fallback #4 above. Each step runs in its own transaction(s), and a failure in one step is logged and does not stop later steps. The exit code is non-zero if any step failed, so the platform alerts.
+Run by the scheduler in §11.4 (GitHub Actions on the free-tier deployment), or hourly by a host's cron, with the fallback #4 above. Run it from **one** scheduler only. Each step runs in its own transaction(s), and a failure in one step is logged and does not stop later steps. The exit code is non-zero if any step failed, so the platform alerts.
 
 | Step | Action | Idempotency |
 |---|---|---|
@@ -576,7 +576,38 @@ Run **hourly** by the host's cron, with the fallback #4 above. Each step runs in
 
 ### 11.3 Email
 
-Django email backend: `console` locally, the provider's SMTP or API backend in production (chosen in Phase 10). Plain-text and simple HTML templates in `notifications/templates/`. Claim OTP emails are sent synchronously (outside the delivery table) with a single retry.
+Django email backend: `console` locally, the provider's SMTP or API backend in production (chosen in Phase 10). **Email is off until a provider exists:** the production settings default `EMAIL_NOTIFICATIONS_ENABLED` to `false`, and refuse to start if it is enabled with the console, locmem, dummy or file backend (they accept a message without sending it, so a delivery would be marked `sent` although nobody received it). While it is off, no `NotificationDelivery` rows are created and notifications are in-app only. `GET /notifications/channels/` returns `{in_app, email}` (`email` is true only with the switch on and a delivering backend); the owner notifications screen uses it to show "Email delivery is currently turned off". Plain-text and simple HTML templates in `notifications/templates/`. Claim OTP emails are sent synchronously (outside the delivery table) with a single retry.
+
+### 11.4 Scheduling with GitHub Actions
+
+The free-tier deployment (Render Free, Neon Free, Vercel Hobby) has no cron, so `.github/workflows/scheduled-jobs.yml` runs the command above against the Neon database. There is no Celery, Redis or worker. **GitHub schedules are best-effort:** a run can start late or be skipped, and GitHub disables schedules in a public repository after 60 days without activity, so nothing here is real time. Scheduled workflows run only from the default branch, and fork pull requests never get the secrets.
+
+| Job | UTC cron | IST | Steps run |
+|---|---|---|---|
+| Daily | `37 3 * * *` | 09:07 every day | `renewal_notifications`, `owner_summaries` |
+| Hourly | `17 * * * *` | hh:47 every hour | `auto_close_attendance` |
+
+Both avoid the top of the hour, when GitHub's queue is busiest. A forgotten check-out blocks the student's next check-in (one open record per student), so attendance runs hourly; a record is still closed at the library's closing time, not at run time, so a late run keeps the history correct. `reconcile_payments` (online payments are off), `expire_holds` (hold expiry is derived on every read) and `send_emails` (no provider) are deliberately not scheduled. All dates are Asia/Kolkata business dates (`apps.core.dates.business_today`).
+
+**Repository secrets** (Settings, Secrets and variables, Actions; an admin must add them). Never put them in a workflow file, a log or a pull request:
+
+| Secret | Value |
+|---|---|
+| `DATABASE_URL` | Neon's **direct** connection string (the host without `-pooler`) and `sslmode=require`, for the role that owns the schema |
+| `SECRET_KEY` | A random value of at least 50 characters. It only satisfies the production settings guard here; it need not match Render's |
+| `JWT_SIGNING_KEY` | A different random value of at least 50 characters (same note) |
+
+The workflow checks that all three exist and that the URL has `sslmode=require` and no `-pooler` host (without printing it), runs `migrate --check` (read-only; it fails loudly if a migration is missing, and never applies one), then runs the command with up to two attempts. It has `permissions: contents: read`, a 10 minute timeout, and one concurrency group, so an hourly run waits for a daily run instead of overlapping it.
+
+**Run it yourself.** Locally, with any PostgreSQL that is not shared (the repo's `docker-compose.yml` database is fine): `python manage.py run_scheduled_jobs --only renewal_notifications --only owner_summaries --dry-run` shows what would happen and saves nothing; drop `--dry-run` to run for real. On GitHub: Actions, "Scheduled jobs", "Run workflow", choose `daily` or `attendance`; a manual run is a dry run unless you untick the box. To inspect a run: Actions, "Scheduled jobs", open the run; the JSON summary lists every step with `checked/created/skipped/processing_errors` counts (counts only, no names, emails or amounts). A failed run is red and GitHub emails the repository owner.
+
+**Duplicate prevention.** Every notification has a deterministic `dedup_key` (SPEC.md 4.5) under a database unique constraint and is inserted with `ON CONFLICT DO NOTHING`; its email delivery row is unique per notification and channel and is created only for a notification that was really inserted. A second run, a retry, a manual run or two overlapping runs therefore create nothing twice. Email sending locks each row with `skip_locked`. Attendance closing re-reads each open record under its row lock.
+
+**Failures.** Each milestone, each member and each owner summary is isolated: if one cannot be built or saved, the others are still saved and the step reports `processing_errors`, which makes the step (and the command and the workflow) fail visibly. Work that succeeded stays saved. Re-running is safe and completes only the missing work, because existing keys are reported as `skipped`. The workflow retries once after 30 seconds (this also covers Neon waking from suspend).
+
+**What is actually delivered today.** In-app notifications only: renewal reminders (3 days before, on the due date, and once when overdue) and the owner's daily dues summary, plus the event notifications of §11.2. Students see them when they open the app; walk-in students who have not claimed their account cannot sign in, so for them the owner's Dues page is the real channel. No email and no SMS is sent, and none is marked as sent.
+
+**Adding a provider later** needs no change to the scheduling: set a real `EMAIL_BACKEND` (and its credentials) and `EMAIL_NOTIFICATIONS_ENABLED=true` for the jobs and for the API, add `send_emails` to the daily job's `--only` list (or schedule it more often), and the existing delivery table (pending, sent, failed, skipped; 5 attempts with backoff) takes over. SMS would be a second `NotificationDelivery.Channel` with its own sender behind the same `senders` interface. Do not enable it from both Render and GitHub.
 
 ---
 

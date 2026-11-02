@@ -3,7 +3,8 @@
 # GitHub Actions is the scheduler; Django does the work (`manage.py run_scheduled_jobs --only <step>`).
 # Every step is idempotent (unique `dedup_key`, row locks), so a retry, a manual run or an overlapping run never
 # creates a duplicate notification. Schedules are best-effort: GitHub may start a run late or skip it, so nothing
-# here is real time. The workflow only runs from the default branch; fork pull requests never receive the secrets.
+# here is real time. Scheduled runs happen only on the default branch, fork pull requests never receive the secrets,
+# and the job itself refuses to run from any other branch (see `if:` below).
 #
 # Not scheduled on purpose: `reconcile_payments` (online payments are off), `expire_holds` (hold expiry is derived on
 # every read) and `send_emails` (no email provider yet). Do not also run these jobs from Render.
@@ -36,16 +37,37 @@ on:
 permissions:
   contents: read
 
-# One run at a time for all scheduled jobs; a later run waits instead of overlapping (never cancel a running one).
+# One concurrency group per job kind, so a slow daily run can never hold up or replace the hourly attendance run
+# (GitHub keeps only one pending run per group and cancels an older pending one). Within a group a later run waits
+# instead of overlapping, and a running one is never cancelled. Runs from another branch and manual dry runs get
+# their own groups, so they can never queue behind or replace a real scheduled run.
+#   libraryhive-daily | libraryhive-attendance            real runs on main (scheduled or manual)
+#   ...-dry                                                manual dry runs
+#   ...-offbranch                                          anything started from a branch other than main
 concurrency:
-  group: libraryhive-scheduled-jobs
+  group: "libraryhive-${{ github.event_name == 'schedule' && (github.event.schedule == '17 * * * *' && 'attendance' || 'daily') || inputs.job }}${{ github.ref != 'refs/heads/main' && '-offbranch' || '' }}${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '-dry' || '' }}"
   cancel-in-progress: false
 
 jobs:
+  # A manual run started from any branch other than main fails loudly here, before any secret is used.
+  wrong-branch:
+    name: Refuse to run outside main
+    if: github.repository == 'Priyasaini7604/LibraryHive' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Stop
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::Scheduled jobs run only from the main branch (this run is on $REF). Nothing was run."
+          exit 1
+
   run:
     name: Run scheduled job
-    # Only in the main repository: forks have no secrets and must not run against anyone's database.
-    if: github.repository == 'Priyasaini7604/LibraryHive'
+    # Only in the main repository, and only from the main branch: forks have no secrets and must not run against
+    # anyone's database, and a manual run from a feature branch must not use the secrets.
+    if: github.repository == 'Priyasaini7604/LibraryHive' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:

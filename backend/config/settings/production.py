@@ -7,6 +7,7 @@ from .base import *
 from .base import (
     ALLOWED_HOSTS,
     CORS_ALLOWED_ORIGINS,
+    EMAIL_BACKEND,
     ENVIRONMENT,
     MIDDLEWARE,
     SECRET_KEY,
@@ -18,6 +19,11 @@ from .guard import unsafe_settings_errors
 DEBUG = False
 SCHEMA_PUBLIC = False
 
+# Email stays off until a real provider is configured: with the default console backend a delivery would be
+# marked `sent` although nobody received it. Turn it on with EMAIL_NOTIFICATIONS_ENABLED=true plus a real
+# EMAIL_BACKEND; the guard below refuses the combination with a backend that does not deliver.
+EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=False, cast=bool)
+
 _errors = unsafe_settings_errors(
     debug=config("DEBUG", default=False, cast=bool),
     secret_key=SECRET_KEY,
@@ -26,6 +32,8 @@ _errors = unsafe_settings_errors(
     cors_allowed_origins=list(CORS_ALLOWED_ORIGINS),
     environment=ENVIRONMENT,
     razorpay_key_id=config("RAZORPAY_KEY_ID", default=""),
+    email_notifications_enabled=EMAIL_NOTIFICATIONS_ENABLED,
+    email_backend=EMAIL_BACKEND,
 )
 if _errors:
     raise ImproperlyConfigured("Unsafe production settings: " + " ".join(_errors))

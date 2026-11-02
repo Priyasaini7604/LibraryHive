@@ -44,7 +44,10 @@ class JobBase(PaymentTestCase):
 class RenewalNotificationTests(JobBase):
     def test_creates_one_notification_per_milestone(self):
         summary = scheduled.renewal_notifications()
-        self.assertEqual(summary, {"due_soon": 1, "due_today": 1, "overdue": 1, "created": 3})
+        self.assertEqual(
+            summary,
+            {"due_soon": 1, "due_today": 1, "overdue": 1, "created": 3, "skipped": 0, "processing_errors": 0},
+        )
         kinds = {n.recipient_id: n.type for n in Notification.objects.exclude(type__in=["payment_received"])}
         self.assertEqual(kinds[self.members["soon"].student_id], "renewal_due_soon")
         self.assertEqual(kinds[self.members["today"].student_id], "renewal_due_today")
@@ -79,7 +82,7 @@ class RenewalNotificationTests(JobBase):
 class OwnerSummaryTests(JobBase):
     def test_one_summary_per_library_per_day(self):
         first = scheduled.owner_summaries()
-        self.assertEqual(first, {"libraries": 1, "created": 1})
+        self.assertEqual(first, {"libraries": 1, "created": 1, "skipped": 0, "processing_errors": 0})
         for _ in range(4):
             self.assertEqual(scheduled.owner_summaries()["created"], 0)
         note = Notification.objects.get(recipient=self.library.owner)

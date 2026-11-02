@@ -103,7 +103,10 @@ def run_steps(*, only: list[str] | None = None, dry_run: bool = False) -> dict:
                     pass
             else:
                 figures = step.run()
-            results.append({"name": step.name, "ok": True, **figures, "seconds": round(time.monotonic() - started, 2)})
+            # A step that finished but could not process some items reports `processing_errors`; that is a failed
+            # step (non-zero exit) although the items that did work stay saved and the later steps still run.
+            ok = not figures.get("processing_errors", 0)
+            results.append({"name": step.name, "ok": ok, **figures, "seconds": round(time.monotonic() - started, 2)})
         except Exception as exc:  # one failing step must not stop the later ones
             logger.exception("Scheduled step failed", extra={"step": step.name})
             results.append({"name": step.name, "ok": False, "error": f"{type(exc).__name__}: {exc}"[:300]})

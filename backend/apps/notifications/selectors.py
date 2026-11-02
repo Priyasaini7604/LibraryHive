@@ -1,7 +1,10 @@
 """Read-side queries for notifications."""
 
+from django.conf import settings
 from django.db.models import Q, QuerySet
 from django.utils import timezone
+
+from config.settings.guard import NON_DELIVERING_EMAIL_BACKENDS
 
 from .models import Notification, NotificationDelivery
 
@@ -14,6 +17,14 @@ def inbox(user, *, unread_only: bool = False) -> QuerySet[Notification]:
 
 def unread_count(user) -> int:
     return Notification.objects.filter(recipient=user, read_at__isnull=True).count()
+
+
+def email_delivery_active() -> bool:
+    """True only when an email would really leave the server: the switch is on and the backend delivers.
+
+    The console, locmem, dummy and file backends accept a message without sending it, so they never count.
+    """
+    return settings.EMAIL_NOTIFICATIONS_ENABLED and settings.EMAIL_BACKEND not in NON_DELIVERING_EMAIL_BACKENDS
 
 
 def due_deliveries(*, now=None) -> QuerySet[NotificationDelivery]:

@@ -25,6 +25,37 @@ DUE_TODAY = "due_today"
 OVERDUE = "overdue"
 
 
+def _notify_isolated(specs: list[NotificationSpec]) -> tuple[int, int, int]:
+    """Create notifications so that one bad row cannot stop the others: `(created, skipped, failed)`.
+
+    The whole batch goes in one insert first. If that raises, each notification is retried on its own, so only
+    the genuinely failing ones are counted as failed. `skipped` are keys that already exist (an earlier run or
+    a repeat), which is the normal outcome of a re-run, not a problem.
+    """
+    unique = list({spec.dedup_key: spec for spec in specs}.values())
+    if not unique:
+        return 0, 0, 0
+    try:
+        created = services.notify_many(unique)
+    except Exception:
+        logger.exception("Notification batch failed; retrying one by one", extra={"batch_size": len(unique)})
+    else:
+        return len(created), len(unique) - len(created), 0
+    created_count = skipped = failed = 0
+    for spec in unique:
+        try:
+            made = services.notify_many([spec])
+        except Exception:
+            failed += 1
+            logger.exception("Notification failed", extra={"dedup_key": spec.dedup_key})
+        else:
+            if made:
+                created_count += 1
+            else:
+                skipped += 1
+    return created_count, skipped, failed
+
+
 def _membership_spec(membership: Membership, milestone: str) -> NotificationSpec:
     """The student's renewal reminder. Key: `renewal:{membership_id}:{milestone}:{due_date}:{recipient_id}`."""
     library = membership.library.name
@@ -70,16 +101,35 @@ def renewal_notifications(*, today: date | None = None) -> dict[str, int]:
         DUE_TODAY: live.filter(next_due_date=today),
         OVERDUE: live.filter(next_due_date__lt=today),
     }
-    specs: list[NotificationSpec] = []
-    candidates = {}
+    candidates: dict[str, int] = {}
+    created = skipped = errors = 0
     for milestone, queryset in groups.items():
-        found = list(queryset)
+        # Each milestone is isolated: a failure in one group (or one member) never stops the others.
+        try:
+            found = list(queryset)
+        except Exception:
+            logger.exception("Could not load memberships", extra={"milestone": milestone})
+            candidates[milestone] = 0
+            errors += 1
+            continue
         candidates[milestone] = len(found)
-        specs.extend(_membership_spec(m, milestone) for m in found)
-    created = services.notify_many(specs)
-    summary = {**{k: v for k, v in candidates.items()}, "created": len(created)}
+        specs: list[NotificationSpec] = []
+        for membership in found:
+            try:
+                specs.append(_membership_spec(membership, milestone))
+            except Exception:
+                errors += 1
+                logger.exception(
+                    "Could not build a reminder", extra={"milestone": milestone, "membership_id": str(membership.pk)}
+                )
+        made, already, failed = _notify_isolated(specs)
+        created, skipped, errors = created + made, skipped + already, errors + failed
+    summary = {**candidates, "created": created, "skipped": skipped, "processing_errors": errors}
     # `created` is reserved by the logging module, so the log line uses another name.
-    logger.info("Renewal notifications", extra={**candidates, "inserted": len(created)})
+    logger.info(
+        "Renewal notifications",
+        extra={**candidates, "inserted": created, "skipped": skipped, "processing_errors": errors},
+    )
     return summary
 
 
@@ -97,19 +147,30 @@ def owner_summaries(*, today: date | None = None) -> dict[str, int]:
     from apps.accounts.models import User
 
     owners = {u.pk: u for u in User.objects.filter(pk__in=[r["library__owner_id"] for r in rows])}
-    specs = [
-        NotificationSpec(
-            recipient=owners[row["library__owner_id"]],
-            type=Notification.Type.OWNER_DAILY_DUES_SUMMARY,
-            title="Today's dues",
-            body=f"{row['due']} member(s) are due and {row['overdue']} are overdue at {row['library__name']}.",
-            dedup_key=f"owner_dues:{row['library_id']}:{today}",
-            entity=("library", row["library_id"]),
-        )
-        for row in rows
-    ]
-    created = services.notify_many(specs)
-    return {"libraries": len(specs), "created": len(created)}
+    specs: list[NotificationSpec] = []
+    errors = 0
+    for row in rows:
+        try:
+            specs.append(
+                NotificationSpec(
+                    recipient=owners[row["library__owner_id"]],
+                    type=Notification.Type.OWNER_DAILY_DUES_SUMMARY,
+                    title="Today's dues",
+                    body=f"{row['due']} member(s) are due and {row['overdue']} are overdue at {row['library__name']}.",
+                    dedup_key=f"owner_dues:{row['library_id']}:{today}",
+                    entity=("library", row["library_id"]),
+                )
+            )
+        except Exception:
+            errors += 1
+            logger.exception("Could not build an owner summary", extra={"library_id": str(row["library_id"])})
+    created, skipped, failed = _notify_isolated(specs)
+    errors += failed
+    logger.info(
+        "Owner summaries",
+        extra={"libraries": len(specs), "inserted": created, "skipped": skipped, "processing_errors": errors},
+    )
+    return {"libraries": len(specs), "created": created, "skipped": skipped, "processing_errors": errors}
 
 
 def send_emails(*, limit: int = 200, now=None) -> dict[str, int]:

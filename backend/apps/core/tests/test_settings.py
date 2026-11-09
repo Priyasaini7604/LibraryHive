@@ -12,6 +12,11 @@ SAFE = {
     "allowed_hosts": ["api.libraryhive.example"],
     "cors_allowed_origins": ["https://libraryhive.example"],
     "environment": "production",
+    "storage_backend": "s3",
+    "public_bucket": "lh-public",
+    "private_bucket": "lh-private",
+    "aws_access_key_id": "key-id",
+    "aws_secret_access_key": "key-secret",
     "razorpay_key_id": "rzp_live_abc",
 }
 
@@ -52,6 +57,59 @@ class ProductionGuardTests(SimpleTestCase):
         self.assertEqual(unsafe_settings_errors(**SAFE, email_notifications_enabled=True, email_backend=smtp), [])
         # Switched off, any backend is fine: no delivery rows are created and nothing is marked sent.
         self.assertEqual(unsafe_settings_errors(**SAFE, email_notifications_enabled=False, email_backend=console), [])
+
+    def test_production_refuses_local_storage(self):
+        errors = unsafe_settings_errors(**{**SAFE, "storage_backend": "local"})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("STORAGE_BACKEND", errors[0])
+        self.assertIn("ephemeral", errors[0])
+
+    def test_production_s3_needs_both_buckets_and_the_keys(self):
+        for field, name in (
+            ("public_bucket", "AWS_STORAGE_BUCKET_NAME"),
+            ("private_bucket", "AWS_PRIVATE_BUCKET_NAME"),
+            ("aws_access_key_id", "AWS_ACCESS_KEY_ID"),
+            ("aws_secret_access_key", "AWS_SECRET_ACCESS_KEY"),
+        ):
+            for blank in ("", "   "):
+                with self.subTest(field=field, blank=repr(blank)):
+                    errors = unsafe_settings_errors(**{**SAFE, field: blank})
+                    self.assertEqual(len(errors), 1)
+                    self.assertIn(name, errors[0])
+
+    def test_all_missing_storage_settings_are_named_together_and_no_value_is_echoed(self):
+        errors = unsafe_settings_errors(
+            **{
+                **SAFE,
+                "public_bucket": "",
+                "private_bucket": "",
+                "aws_secret_access_key": "",
+                "aws_access_key_id": "super-secret-id",
+            }
+        )
+        self.assertEqual(len(errors), 1)
+        for name in ("AWS_STORAGE_BUCKET_NAME", "AWS_PRIVATE_BUCKET_NAME", "AWS_SECRET_ACCESS_KEY"):
+            self.assertIn(name, errors[0])
+        self.assertNotIn("super-secret-id", errors[0])
+
+    def test_the_private_bucket_must_not_be_the_public_bucket(self):
+        errors = unsafe_settings_errors(**{**SAFE, "private_bucket": SAFE["public_bucket"]})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("different bucket", errors[0])
+
+    def test_staging_may_still_use_local_storage(self):
+        self.assertEqual(
+            unsafe_settings_errors(
+                **{
+                    **SAFE,
+                    "environment": "staging",
+                    "storage_backend": "local",
+                    "public_bucket": "",
+                    "private_bucket": "",
+                }
+            ),
+            [],
+        )
 
     def test_test_keys_allowed_in_staging(self):
         self.assertEqual(

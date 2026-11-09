@@ -10,6 +10,13 @@ from apps.core.search import phone_digits
 from .models import Payment
 
 
+def online_payments_available() -> bool:
+    """Whether a payment gateway is configured (screens hide the gateway button when it is not)."""
+    from . import gateway
+
+    return gateway.is_configured()
+
+
 def student_payments(student, *, order_id: str | None = None) -> QuerySet[Payment]:
     """The student's own payments, newest first (#44); `order_id` is an exact match used by checkout."""
     queryset = Payment.objects.filter(student=student).select_related("library")

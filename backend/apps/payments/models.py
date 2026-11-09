@@ -184,3 +184,104 @@ class PaymentWebhookEvent(BaseModel):
 
     def __str__(self):
         return f"{self.event_type} {self.event_id}"
+
+
+class LibraryPaymentSettings(BaseModel):
+    """How a library takes direct UPI payments (SPEC.md 3.11b). One row per library, created on first save.
+
+    The QR image lives in the *private* object store; only its key is kept here. Nothing in this row is part of
+    the public library payload: students get it only through the payment-info endpoint, with a live hold or an
+    active membership at this library.
+    """
+
+    library = models.OneToOneField("libraries.Library", on_delete=models.CASCADE, related_name="payment_settings")
+    upi_enabled = models.BooleanField(default=False)
+    upi_id = models.CharField(max_length=100, blank=True)
+    instructions = models.CharField(max_length=1000, blank=True)
+    qr_key = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name_plural = "library payment settings"
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(upi_enabled=False) | ~Q(upi_id="") | ~Q(qr_key=""),
+                name="paysettings_enabled_needs_target",
+            ),
+        ]
+
+    def __str__(self):
+        return f"payment settings of {self.library_id}"
+
+
+class UpiPaymentRequest(BaseModel):
+    """A student's claim that they paid the library directly by UPI (SPEC.md 3.11c, 4.3b).
+
+    This is *not* money. The immutable `Payment` ledger gets a row only when the owner approves, after checking
+    their own UPI or bank history; until then this row is just a pending claim. A screenshot or a UTR proves
+    nothing by itself.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    library = models.ForeignKey("libraries.Library", on_delete=models.PROTECT, related_name="upi_requests")
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="upi_requests")
+    plan = models.ForeignKey("libraries.PricingPlan", on_delete=models.PROTECT, related_name="upi_requests")
+    purpose = models.CharField(max_length=20, choices=Payment.Purpose.choices)
+    hold = models.ForeignKey("seats.SeatHold", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    seat = models.ForeignKey("seats.Seat", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    membership = models.ForeignKey(
+        "memberships.Membership", on_delete=models.PROTECT, null=True, blank=True, related_name="upi_requests"
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # the plan price when the request was made
+    utr = models.CharField(max_length=30)  # normalised: upper case, no spaces
+    student_note = models.CharField(max_length=300, blank=True)
+    screenshot_key = models.CharField(max_length=255, blank=True)  # private object store
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=300, blank=True)
+    payment = models.OneToOneField(Payment, on_delete=models.PROTECT, null=True, blank=True, related_name="upi_request")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["library", "status", "created_at"], name="upireq_library_status_idx"),
+            models.Index(fields=["student", "-created_at"], name="upireq_student_created_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name="upireq_amount_positive"),
+            models.UniqueConstraint(
+                fields=["utr"], condition=Q(status__in=["pending", "approved"]), name="upireq_utr_unique_live"
+            ),
+            models.UniqueConstraint(
+                fields=["student", "library"], condition=Q(status="pending"), name="upireq_one_pending_per_student"
+            ),
+            models.CheckConstraint(
+                condition=Q(purpose="new_membership", hold__isnull=False, seat__isnull=False)
+                | Q(purpose="renewal", membership__isnull=False),
+                name="upireq_purpose_fields",
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=["pending", "approved", "rejected", "cancelled"]), name="upireq_status_valid"
+            ),
+            models.CheckConstraint(
+                condition=~Q(status__in=["approved", "rejected"])
+                | (Q(reviewed_by__isnull=False) & Q(reviewed_at__isnull=False)),
+                name="upireq_reviewed_has_reviewer",
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="approved") | Q(payment__isnull=False), name="upireq_approved_has_payment"
+            ),
+            models.CheckConstraint(
+                condition=~Q(status="rejected") | ~Q(review_note=""), name="upireq_rejected_has_reason"
+            ),
+        ]
+
+    def __str__(self):
+        return f"upi request {self.pk} ({self.status})"

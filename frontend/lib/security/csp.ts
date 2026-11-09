@@ -29,7 +29,11 @@ function originOf(url: string | undefined): string | null {
 
 export function buildCsp({ nonce, apiUrl, mediaOrigin, mapTileUrl, isDev }: CspOptions): string {
   const api = originOf(apiUrl);
-  const media = originOf(mediaOrigin);
+  // MEDIA_ORIGIN may list several origins, comma separated (the public photo store and the private bucket).
+  const media = (mediaOrigin ?? "")
+    .split(",")
+    .map((origin) => originOf(origin.trim()))
+    .filter((origin): origin is string => origin !== null);
   // Only a template that passes the same validation the map uses may add a source; anything else adds nothing.
   const tiles = tileOrigin(mapTileUrl);
   const directives: Record<string, string[]> = {
@@ -47,7 +51,10 @@ export function buildCsp({ nonce, apiUrl, mediaOrigin, mapTileUrl, isDev }: CspO
       "'self'",
       "data:",
       "blob:",
-      ...(media ? [media] : []),
+      ...media,
+      // Private payment images come from the API itself in development (signed links) and from the private
+      // bucket in production (pre-signed URLs), so the API origin may serve images too.
+      ...(api ? [api] : []),
       // OpenStreetMap now serves tiles from the bare host; the wildcard covers the older a/b/c subdomains.
       "https://tile.openstreetmap.org",
       "https://*.tile.openstreetmap.org",

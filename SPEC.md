@@ -50,6 +50,8 @@
 | 16 | `AttendanceRecord` | attendance | Check-in / check-out | New |
 | 17 | `Complaint` | complaints | Complaint lifecycle | New |
 | 18 | `VisitRequest` | visits | Demo/visit requests | New |
+| 19 | `LibraryPaymentSettings` | payments | A library's direct UPI details and QR (UPI-01, D20) | New |
+| 20 | `UpiPaymentRequest` | payments | A student's claim that they paid the library directly by UPI, pending the owner's decision (UPI-05, D20) | New |
 
 ### 2.1 Entities deliberately **not** created
 
@@ -320,6 +322,49 @@ The immutable ledger for online and offline money. A successful payment also rec
 **Immutability:** after a row reaches `success`, `needs_refund`, `failed` or `cancelled`, only the allowed transitions in §4.3 are possible. Amount, plan, period and student never change. There is no delete.
 **Indexes:** uniques above; `(library_id, paid_at DESC)`; `(student_id, created_at DESC)`; `(status, created_at)` for reconciliation; `(membership_id)`.
 
+### 3.11b `LibraryPaymentSettings` (payments), D20
+
+How a library takes **direct UPI payments**: the student pays the owner's own UPI account and the owner confirms by hand. LibraryHive never holds this money, takes no commission and cannot see whether it arrived. One row per library, created on first save.
+
+| Field | Type | N | Notes |
+|---|---|---|---|
+| library_id | OneToOne → Library | | `CASCADE` |
+| upi_enabled | bool | | default false |
+| upi_id | varchar(100) | | blank allowed; format `name@bank` |
+| instructions | varchar(1000) | | plain text, shown to a paying student |
+| qr_key | varchar(255) | | object key in the **private** store; blank when there is no QR |
+
+**Constraint** `paysettings_enabled_needs_target`: `CHECK (NOT upi_enabled OR upi_id <> '' OR qr_key <> '')`.
+**Privacy:** nothing here is part of any public library payload. A student receives these details only while paying that library (a live booking hold, or an active membership for a renewal); anyone else gets 404.
+
+### 3.11c `UpiPaymentRequest` (payments), D20
+
+A **claim**, not money. The immutable `Payment` ledger gets a row only when the owner approves (§4.3b). A screenshot or a UTR proves nothing by itself.
+
+| Field | Type | N | Notes |
+|---|---|---|---|
+| library_id, student_id, plan_id | FK | | `PROTECT`; taken from the student's own hold or membership, never from the request |
+| purpose | varchar | | `new_membership` \| `renewal` |
+| hold_id, seat_id | FK → SeatHold, Seat | N | new membership only; the seat is *not* held by the request |
+| membership_id | FK → Membership | N | renewal only |
+| amount | decimal(10,2) | | the plan price when the request was made |
+| utr | varchar(30) | | normalised: upper case, no spaces, 10 to 30 letters and digits |
+| student_note | varchar(300) | | |
+| screenshot_key | varchar(255) | | blank when none; **private** store |
+| status | varchar | | `pending` \| `approved` \| `rejected` \| `cancelled` |
+| reviewed_by_id, reviewed_at | FK → User, timestamptz | N | who decided and when |
+| review_note | varchar(300) | | the owner's reason; required for `rejected` |
+| payment_id | OneToOne → Payment | N | set on approval |
+
+**Constraints**
+- `upireq_amount_positive`, `upireq_status_valid`.
+- `upireq_utr_unique_live`: unique `utr` where `status IN ('pending','approved')`. The same UTR cannot be claimed twice, whoever sends it; a rejected or cancelled UTR can be sent again.
+- `upireq_one_pending_per_student`: unique `(student_id, library_id)` where `status='pending'`.
+- `upireq_purpose_fields`: a new membership needs a hold and a seat, a renewal needs a membership.
+- `upireq_reviewed_has_reviewer`, `upireq_approved_has_payment`, `upireq_rejected_has_reason`.
+
+**Indexes:** `(library_id, status, created_at)` for the owner's list; `(student_id, created_at DESC)`.
+
 ### 3.12 `PaymentWebhookEvent` (payments)
 
 | Field | Type | N | Notes |
@@ -340,7 +385,7 @@ Only **signature-valid** events are stored. Invalid ones are rejected (400) and 
 |---|---|---|---|
 | recipient_id | FK → User | | `PROTECT` |
 | library_id | FK → Library | N | `PROTECT` |
-| type | varchar(40) | | `renewal_due_soon`, `renewal_due_today`, `membership_overdue`, `owner_daily_dues_summary`, `booking_confirmed`, `payment_received`, `payment_needs_refund`, `complaint_created`, `complaint_updated`, `visit_requested`, `visit_decided`, `account_claimed`, `hold_released`, `membership_archived` |
+| type | varchar(40) | | `renewal_due_soon`, `renewal_due_today`, `membership_overdue`, `owner_daily_dues_summary`, `booking_confirmed`, `payment_received`, `payment_needs_refund`, `upi_payment_submitted`, `upi_payment_approved`, `upi_payment_rejected`, `complaint_created`, `complaint_updated`, `visit_requested`, `visit_decided`, `account_claimed`, `hold_released`, `membership_archived` |
 | title | varchar(150) | | |
 | body | varchar(1000) | | |
 | entity_type, entity_id | varchar(40), UUID | N | deep-link target |
@@ -485,6 +530,34 @@ stateDiagram-v2
 - `success` for `renewal`: extend `next_due_date` per D5. The new period starts at the previous `next_due_date`, or today if the member is more than 15 days overdue, and lasts `plan.duration_days`. The seat is kept.
 - If the seat was lost (a late payment after the hold expired and the seat was taken), the payment becomes `needs_refund`, and the owner and student are notified (refund handled outside the system, PAY-14).
 
+### 4.3b Direct UPI payment with manual approval (D20)
+
+**Flow.** The student pays the owner's UPI account, then sends the UTR (and optionally a screenshot). The owner checks their own UPI or bank history and approves or rejects. Nothing is confirmed by the request itself.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: student sends UTR
+  pending --> approved: owner approves (membership activated, Payment row written)
+  pending --> rejected: owner rejects with a reason
+  pending --> cancelled: student cancels
+  approved --> [*]
+  rejected --> [*]
+  cancelled --> [*]
+```
+
+- **Server-side only.** Library, plan, seat and amount come from the student's own hold or membership. The client sends only the booking reference, the UTR, an optional note and an optional image.
+- **The seat hold is not extended.** The 15-minute hold keeps its own expiry; a pending request holds nothing. A booking request is accepted while the student's own hold is live or has just lapsed (they may have paid and then run out of time), and the seat is checked again at approval.
+- **Approval is one transaction** that locks the request, then (new membership) the seat and the student's own holds, or (renewal) the membership. It re-checks everything, then activates the membership (`source=online`) or applies the renewal exactly as an online renewal does (D5), writes the `Payment` row through `record_offline_payment` (`channel=offline`, `method=upi_direct`, `verified_via=manual`, `recorded_by` = the approving owner, amount = the plan price, receipt number from the sequence), completes the student's own pending hold, marks the request `approved` with `reviewed_by` and `reviewed_at`, audits and notifies.
+- **If the seat is gone** (occupied, disabled, or held live by someone else) approval fails with 409 `SEAT_UNAVAILABLE` and changes nothing. The owner then either approves onto **another free seat of the same library** (`seat_id`, re-checked under the lock) or rejects and refunds the student directly. LibraryHive does not move money and never implies an automatic refund.
+- **A renewal** needs the membership to be active and, at submission, within the renewal window (`RENEWAL_NOT_OPEN` otherwise). If the membership was archived while the request waited, approval fails with 409 `MEMBERSHIP_ARCHIVED`.
+- **Concurrency.** The request row is locked first, so two approvals, or an approval and a rejection or cancellation, produce exactly one outcome; the loser gets 409 `ALREADY_DECIDED`. Lock order: Request, Seat, Hold (new) or Request, Membership (renewal); `seats.cancel_hold` never takes a Request lock, so there is no cycle. A duplicate UTR or a second pending request that slips past the checks is stopped by the partial uniques and answered 409.
+- **Rejected, cancelled and abandoned requests** create no membership and no `Payment`. A request is never auto-approved or auto-expired; it waits for the owner, and the student may contact the library or cancel.
+- **Review-time policy (so nobody waits in silence).** The target is `UPI_REVIEW_TARGET_HOURS` (default 24). A pending request older than that is flagged `overdue` (with `waiting_hours`) to both sides: the student sees that the library has not decided, is told to contact the library (phone and email shown) and that they may cancel, and the owner sees it highlighted and counted in the navigation badge. **Nothing is decided by the clock:** no auto-approval, no auto-rejection, no auto-cancel, and no wording that implies a refund; cancelling or rejecting does not move money. An old request can still be approved if the seat is free. There is no scheduled job for this, so the scheduler is unchanged.
+- **Cancelling and resubmitting.** Only the student can cancel, and only while the request is `pending` (approved requests cannot be undone by the student). After a rejection or cancellation the **same student** may send the same UTR again, because an owner may reject by mistake; nobody **else** may use a UTR that any request, in any status, already carries (409 `DUPLICATE_UTR`). A pending or approved UTR is unique for everyone. Repeated attempts are throttled (`upi_submit`) and limited to one pending request per student and library.
+- **One message on approval.** The student receives `upi_payment_approved` only; the generic "payment recorded" message of the offline-payment writer is suppressed for UPI (`record_offline_payment(notify=False)`). Offline walk-in payments recorded by an owner still send it.
+- **Gateway availability.** `GET /student/holds/current/` and the membership payloads carry `library.gateway_enabled` (false when `RAZORPAY_KEY_ID` or `RAZORPAY_KEY_SECRET` is unset and no test gateway is installed). The checkout and renewal screens then hide the gateway button and say that online payment is not available; a configured gateway behaves exactly as before.
+- **Not used by the scheduler.** `reconcile_payments` filters `channel='online'`, so it never touches a UPI request.
+
 ### 4.4 Membership history
 
 - Memberships are never deleted. Archival sets `state='archived'`, `archived_at`, `archived_by` and `archive_reason` **and keeps `seat_id`**. The partial unique index no longer counts it, so the seat is immediately free (derived status becomes `empty`).
@@ -501,6 +574,9 @@ stateDiagram-v2
 | Renewal milestone to the student | `renewal:{membership_id}:{milestone}:{due_date}:{recipient_id}` |
 | Owner daily dues summary | `owner_dues:{library_id}:{business_date}` |
 | Booking confirmed / payment received | `payment:{payment_id}:{type}:{recipient_id}` |
+| UPI payment submitted (owner) | `upi:{request_id}:submitted:{recipient_id}` |
+| UPI payment approved (student) | `upi:{request_id}:approved:{recipient_id}` |
+| UPI payment rejected (student) | `upi:{request_id}:rejected:{recipient_id}` |
 | Complaint created / updated | `complaint:{complaint_id}:{status}:{recipient_id}` |
 | Visit requested / decided | `visit:{visit_id}:{status}:{recipient_id}` |
 | Owner released a student's booking hold (student only) | `hold:{hold_id}:released:{recipient_id}` |
@@ -632,6 +708,8 @@ There is no production data. The current DB contains only seed and demo data, so
 | `Payment.method` | gateway, cash, upi_direct, bank_transfer |
 | `Payment.status` | pending, success, failed, cancelled, needs_refund |
 | `Payment.verified_via` | checkout, webhook, reconcile, manual |
+| `UpiPaymentRequest.status` | pending, approved, rejected, cancelled |
+| `UpiPaymentRequest.purpose` | new_membership, renewal |
 | `AccountClaim.channel` / `.status` | email_otp, owner_code, password_reset / pending, used, expired, revoked |
 | `NotificationDelivery.status` | pending, sent, failed, skipped |
 | `AttendanceRecord.status` | open, closed, auto_closed |

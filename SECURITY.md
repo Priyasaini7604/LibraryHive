@@ -134,7 +134,7 @@ Bearer-token endpoints are not exposed to CSRF (browsers do not attach the heade
 
 `[CONTROL]` Default deny: `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`. Public endpoints opt in with `AllowAny`, and the list of public endpoints is fixed:
 
-> `/health/`, `/meta/*`, `GET /libraries/`, `GET /libraries/{id}/`, `GET /libraries/{id}/seats/`, `/auth/register|login|refresh|claim/*|password-reset/*`, `/payments/webhook/razorpay/` (signature-protected), `/internal/jobs/run/` (token-protected, disabled unless configured), `/schema/` (non-production only).
+> `/health/`, `/meta/*`, `GET /libraries/`, `GET /libraries/{id}/`, `GET /libraries/{id}/seats/`, `/auth/register|login|refresh|claim/*|password-reset/*`, `/payments/webhook/razorpay/` (signature-protected), `/files/private/{token}/` (signed, expiring link to one private image; local filesystem only, 404 on S3), `/internal/jobs/run/` (token-protected, disabled unless configured), `/schema/` (non-production only).
 
 | Namespace | Permission | Notes |
 |---|---|---|
@@ -239,7 +239,11 @@ Each app's `tests/test_isolation.py` builds Library A and Library B, Owner A and
 10. Limits: 15 photos per library; upload throttle 30 per hour per user.
 11. Storage credentials are write-limited to the app's bucket (least privilege, §13).
 
-`[TEST]` Oversize file, a non-image renamed `.jpg`, an SVG, a decompression bomb, EXIF removed after upload, another owner's photo ID gives 404.
+12. **Direct UPI payments (D20).** The library's QR code and each payment screenshot go through the same pipeline and are stored in the **private** store, never the public one: `payments/{library_id}/qr/{uuid}.webp` and `payments/{library_id}/screenshots/{uuid}.webp`. A QR is encoded **lossless** and its transparency is flattened onto white, so it keeps scanning; the tests scan the stored and the served image.
+13. A private image is reached only through a **short-lived link** (10 minutes) that a permission-checked endpoint hands out: the QR to a student who is paying that library right now (a live hold, or an active membership for a renewal) and to that library's owner; a screenshot to the student who sent it and to that library's owner. On S3-compatible storage the link is the provider's pre-signed URL. On the local filesystem (development and tests) it is a signed token served by `GET /api/v1/files/private/{token}/`, which answers 404 when `STORAGE_BACKEND=s3`, so production has one way to reach a private file. That route is public by design (an `<img>` cannot send a bearer token) and is listed in `test_route_inventory`.
+14. Screenshots and QR codes are never written to logs; audit rows record only that a QR changed, never its content.
+
+`[TEST]` Oversize file, a non-image renamed `.jpg`, an SVG, a decompression bomb, EXIF removed after upload, another owner's photo ID gives 404. Direct UPI: a QR still scans after upload and after being served (PNG, a large JPEG, a transparent PNG), a forged or expired private link serves nothing, another student's or another library's screenshot is 404.
 
 ---
 
@@ -274,6 +278,17 @@ Each app's `tests/test_isolation.py` builds Library A and Library B, Owner A and
 - Offline payments are recorded only by the owner of the membership's library, with `recorded_by`, a sequential receipt number and an audit row.
 - Reconciliation queries Razorpay for stale pending orders using server credentials only (BACKEND §10).
 - `needs_refund` cases are surfaced to the owner and student; refunds are manual (PAY-14) and the outcome is recorded by the team. The refund/cancellation policy text is `[PRE-LAUNCH REQUIREMENT]` (§19).
+
+### 10.4b Direct UPI payments (D20)
+
+These are **not** gateway payments: LibraryHive cannot verify them, so the control is a person.
+
+- A `UpiPaymentRequest` is only a claim. A membership or a `Payment` row exists only after the owner of that library approves, in one transaction that rechecks the seat or the membership under row locks (SPEC §4.3b).
+- Amount, library, student, plan and status are never read from the request body; they come from the student's own hold or membership. Another library's request is 404; a student calling an owner endpoint is 403.
+- The UTR is normalised and unique among pending and approved requests (database partial unique). A fake UTR or an edited screenshot is possible, so the approve dialog makes the owner confirm they saw the exact amount in their own UPI or bank history. A screenshot is never treated as proof.
+- **Residual risks:** a compromised owner account could swap the QR so students pay someone else (every QR change is audited, and the owner's settings page shows the live QR); a student can claim a payment they did not make (the owner's check is the defence); a student who paid but is rejected, or whose seat was taken, must be refunded by the owner directly. The UI never implies an automatic refund.
+- Throttles: `upload` (30 per hour) for the owner's QR and settings writes, `upi_submit` (20 per hour) for student submissions.
+- Audit actions: `payment_settings.update`, `payment_settings.qr_upload`, `payment_settings.qr_replace`, `payment_settings.qr_remove`, `upi_payment.submit`, `upi_payment.approve`, `upi_payment.reject`, `upi_payment.cancel`.
 
 ### 10.5 Payment security tests `[TEST]`
 

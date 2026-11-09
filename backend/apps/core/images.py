@@ -33,7 +33,11 @@ def _reject_type() -> ValidationFailed:
     return ValidationFailed("Upload a JPG, PNG or WEBP image.", code="FILE_TYPE")
 
 
-def process_upload(uploaded_file) -> ProcessedImage:
+def process_upload(uploaded_file, *, qr: bool = False) -> ProcessedImage:
+    """Verify and re-encode an image. `qr=True` is for a payment QR code: transparency is flattened onto white
+    (a transparent QR is unreadable on a dark page) and the WEBP is lossless, so the modules stay sharp and the
+    code keeps scanning. Everything else (size, type and pixel limits, metadata stripping) is the same.
+    """
     max_bytes = settings.MAX_UPLOAD_BYTES
     size = getattr(uploaded_file, "size", None)
     if size is not None and size > max_bytes:
@@ -64,6 +68,10 @@ def process_upload(uploaded_file) -> ProcessedImage:
     image.info = {}  # drop EXIF, XMP, ICC and any other embedded metadata
     if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+    if qr and image.mode == "RGBA":
+        background = Image.new("RGB", image.size, (255, 255, 255))
+        background.paste(image, mask=image.getchannel("A"))
+        image = background
 
     display = image.copy()
     display.thumbnail((DISPLAY_MAX_EDGE, DISPLAY_MAX_EDGE))
@@ -71,7 +79,7 @@ def process_upload(uploaded_file) -> ProcessedImage:
     thumb.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE))
 
     return ProcessedImage(
-        display=_encode_webp(display),
+        display=_encode_webp(display, lossless=qr),
         thumbnail=_encode_webp(thumb),
         width=display.width,
         height=display.height,
@@ -79,8 +87,11 @@ def process_upload(uploaded_file) -> ProcessedImage:
     )
 
 
-def _encode_webp(image: Image.Image) -> bytes:
+def _encode_webp(image: Image.Image, *, lossless: bool = False) -> bytes:
     buffer = io.BytesIO()
     # A fresh image object carries no EXIF; we never pass exif= to save().
-    image.save(buffer, format="WEBP", quality=WEBP_QUALITY, method=4)
+    if lossless:
+        image.save(buffer, format="WEBP", lossless=True, method=4)
+    else:
+        image.save(buffer, format="WEBP", quality=WEBP_QUALITY, method=4)
     return buffer.getvalue()

@@ -5,7 +5,7 @@ import logging
 
 from django.conf import settings
 from django.db import DatabaseError, connection
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from drf_spectacular.utils import extend_schema
 from drf_spectacular.views import SpectacularAPIView
 from rest_framework.permissions import AllowAny, IsAdminUser
@@ -16,6 +16,7 @@ from . import jobs
 from .models import Amenity, Domain
 from .responses import envelope, error_response, ok
 from .serializers import AmenitySerializer, DomainSerializer
+from .storage import private_storage, read_private_file_key
 
 logger = logging.getLogger(__name__)
 
@@ -102,3 +103,27 @@ def json_server_error(request):
         envelope(success=False, error="Something went wrong on our side. Please try again.", error_code="SERVER_ERROR"),
         status=500,
     )
+
+
+class PrivateFileView(APIView):
+    """Serves one private image for a signed, expiring link (local filesystem only).
+
+    The link is made by `core.storage.private_file_url`, after the calling view has checked who may see the image.
+    With S3-compatible storage the provider serves pre-signed URLs itself, so this endpoint answers 404 there:
+    production has exactly one way to reach a private file.
+    """
+
+    authentication_classes: list = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(exclude=True)
+    def get(self, request, token):
+        if settings.STORAGE_BACKEND == "s3":
+            raise Http404
+        key = read_private_file_key(token)
+        storage = private_storage()
+        if key is None or not storage.exists(key):
+            raise Http404
+        response = FileResponse(storage.open(key, "rb"), content_type="image/webp")
+        response["Cache-Control"] = "private, no-store"
+        return response

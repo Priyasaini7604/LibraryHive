@@ -29,7 +29,7 @@ def current_booking_holds(student) -> QuerySet[SeatHold]:
     return (
         SeatHold.objects.live()
         .filter(student=student, kind=SeatHold.Kind.BOOKING)
-        .select_related("seat", "library", "plan")
+        .select_related("seat", "library__payment_settings", "plan")
         .order_by("expires_at")
     )
 

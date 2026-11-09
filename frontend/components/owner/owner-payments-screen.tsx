@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ExportButton } from "@/components/owner/export-button";
@@ -110,7 +111,17 @@ export function OwnerPaymentsScreen() {
       <PageHeader
         title="Payments"
         description="Every online and offline payment for your library."
-        actions={<ExportButton kind="payments" query={{ from: from || undefined, to: to || undefined }} />}
+        actions={
+          <>
+            <Button asChild variant="secondary">
+              <Link href="/owner/payments/upi">UPI payments to check</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/owner/payments/upi/settings">UPI settings</Link>
+            </Button>
+            <ExportButton kind="payments" query={{ from: from || undefined, to: to || undefined }} />
+          </>
+        }
       />
       <FilterBar label="Filter payments">
         <FormField label="Search" className="sm:w-56">

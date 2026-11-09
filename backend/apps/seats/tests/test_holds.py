@@ -79,7 +79,10 @@ class CreateBookingHoldTests(HoldTestCase):
         data = response.json()["data"]
         self.assertEqual(set(data), {"id", "seat", "library", "plan", "amount", "expires_at"})
         self.assertEqual(data["seat"], {"id": str(self.seat.pk), "label": "A-1"})
-        self.assertEqual(data["library"], {"id": str(self.library.pk), "name": self.library.name})
+        self.assertEqual(
+            data["library"],
+            {"id": str(self.library.pk), "name": self.library.name, "upi_enabled": False, "gateway_enabled": True},
+        )
         self.assertEqual(data["plan"]["price"], "1200.00")
         self.assertEqual(data["amount"], "1200.00")
         hold = SeatHold.objects.get()

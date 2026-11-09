@@ -144,7 +144,7 @@
 | BOOK-04 | Student cancels own hold | F1, SPEC §5.3 | P0 | NOT IMPLEMENTED | P2 | Cancelling releases the seat. Only the student who holds it, or the owner, can cancel. |
 | BOOK-05 | Prevent invalid or duplicate bookings | NEW-D | P0 | NOT IMPLEMENTED | P2 | Rejected: a seat in another library, a reserved or occupied seat, an inactive plan, a second concurrent hold by the same student in the same library, and a booking while the student already has an active membership at that library (one non-archived membership per student per library, approved default). |
 | BOOK-06 | Booking confirmation after verified payment: membership becomes Active and seat becomes Occupied | FR-06, SRS §7.2, NEW-D | P0 | NOT IMPLEMENTED | P3 | Happens only via PAY-03 or PAY-04, atomically. Running it twice has the same effect as once (idempotent). |
-| BOOK-07 | Owner approve/reject of online bookings | SRS §4.4, D3 | P2 | NOT IMPLEMENTED | — | D3: no manual approval in the MVP. Verified payment confirms the booking (BOOK-06). The owner keeps control through manual override (SEAT-07) and archival (MEM-06). |
+| BOOK-07 | Owner approve/reject of online bookings | SRS §4.4, D3, D20 | P2 | NOT IMPLEMENTED (gateway bookings); **direct UPI payments are approved by the owner, see UPI-07** | — | D3: no manual approval of *gateway* bookings in the MVP. D20 adds owner approval only for payments made directly to the owner by UPI (UPI-04 to UPI-09). Verified payment confirms the booking (BOOK-06). The owner keeps control through manual override (SEAT-07) and archival (MEM-06). |
 
 ### 3.7 Membership lifecycle
 
@@ -190,6 +190,20 @@
 | PAY-11 | Dues aging buckets (1–7, 8–15, 15+ days) | F1 §5.1.8 | P1 | NOT IMPLEMENTED | P3 | Shown as grouped view of PAY-10. |
 | PAY-12 | Downloadable/printable receipt | F1 §5.2.11 | P1 | NOT IMPLEMENTED | P3 | Receipt page per payment. |
 | PAY-13 | Fee management model | NEW-A "Fee management", D14 | P0 | NOT IMPLEMENTED | P3 | Dues are derived from membership dates and the plan price (D14). One payment equals one full plan period. No partial payments in the MVP. The amount due is always computed on the backend. |
+| UPI-01 | Owner uploads, replaces and removes the library's UPI QR code | D20 | P0 | IMPLEMENTED | P3 | Private object store, verified and re-encoded losslessly so it still scans; transparency flattened onto white. Audited. |
+| UPI-02 | Owner sets a UPI ID, payment instructions and an on/off switch | D20 | P0 | IMPLEMENTED | P3 | UPI payments can be switched on only with a QR or a UPI ID. Instructions are plain text. Audited. |
+| UPI-03 | Student sees the library's QR, UPI ID, amount and instructions while paying | D20 | P0 | IMPLEMENTED | P3 | Only with a live hold (or an active membership for a renewal) at that library; anyone else gets 404. The amount shown is the plan price. |
+| UPI-04 | Student sends a UTR and an optional screenshot; sending confirms nothing | D20 | P0 | IMPLEMENTED | P3 | UTR is normalised and unique among pending and approved requests. Library, plan, seat and amount come from the server. The screen says plainly that the owner must approve. |
+| UPI-05 | Student sees Pending, Approved, Rejected or Cancelled, can cancel a pending request and can contact the library | D20 | P0 | IMPLEMENTED | P3 | The library's phone and email are shown. A rejected or cancelled request never claims a refund. |
+| UPI-06 | Owner lists pending requests and inspects amount, UTR, student details and the screenshot | D20 | P0 | IMPLEMENTED | P3 | Scoped to the owner's library (other libraries are 404). The screenshot is a short-lived signed link. |
+| UPI-07 | Owner approves after checking their own UPI or bank history | D20 | P0 | IMPLEMENTED | P3 | One transaction: activates the membership or applies the renewal, writes the `Payment` ledger row, records `reviewed_by` and `reviewed_at`, audits and notifies. Rechecks the seat or the membership under row locks. |
+| UPI-08 | Owner rejects with a required reason | D20 | P0 | IMPLEMENTED | P3 | Nothing is activated and no `Payment` row is written. The student is told the reason and that LibraryHive does not refund UPI transfers. |
+| UPI-09 | Seat unavailable at approval: approve onto another free seat or reject and refund directly | D20 | P0 | IMPLEMENTED | P3 | 409 `SEAT_UNAVAILABLE`, nothing changes. The hold is never extended. |
+| UPI-10 | Concurrency and duplicate safety for submission and decision | D20 | P0 | IMPLEMENTED | P3 | Request row lock, partial uniques, 409 `ALREADY_DECIDED` and `DUPLICATE_UTR`. |
+| UPI-11 | Notifications: submitted (owner), approved and rejected (student) | D20 | P0 | IMPLEMENTED | P3 | Reuses the notification service with dedup keys `upi:{request_id}:{event}:{recipient_id}`; in-app only while email is off. |
+| UPI-13 | Owner sees how many UPI payments wait, and everyone sees how long a request has waited | D20 | P0 | IMPLEMENTED | P3 | Badge on the owner's Payments link (red when any is overdue); `waiting_hours` and `overdue` on every request; target `UPI_REVIEW_TARGET_HOURS` (24). No automatic decision and no refund wording. |
+| UPI-14 | The gateway button is hidden when no gateway is configured | D20 | P0 | IMPLEMENTED | P3 | `library.gateway_enabled` on the hold and membership payloads. A configured gateway is unchanged. |
+| UPI-12 | Private storage for the QR and screenshots | D20 | P0 | PARTIALLY IMPLEMENTED | P3 | Code uses the private store with pre-signed URLs on S3-compatible storage. A production bucket has not been created or tested; see SECURITY.md section 9 and the deployment checklist. |
 | PAY-14 | Refunds | — | P2 | NOT IMPLEMENTED | — | Excluded by the brief ("no complex refund system"). Manual refunds are made outside the system. |
 
 ### 3.10 Notifications (automatic renewal and expiry)
@@ -300,7 +314,7 @@ If Phase 2 or the implementation finds otherwise, logging is reduced to LOG-01 t
 
 ## 4. Explicitly NOT in MVP (P2 / excluded)
 
-AI recommendations or assistant · exam communities · advanced personalisation · demand prediction · multi-branch or multi-library per owner · platform super admin · drag-and-drop floor-plan editor · waitlist and seat swap · native mobile apps · complex subscription billing · multiple payment gateways · advanced accounting or reconciliation · refund workflow · WhatsApp/SMS infrastructure · per-shift seat selling (D1) · owner approval of online bookings (D3) · partial payments (D14) · phone-number login (D13) · owner verification/invites (D11) · hosted error tracking (D17) · QR or biometric attendance · student–owner chat · microservices, Kubernetes, Kafka, complex Redis · book cataloguing, payroll, canteen (SRS §1.2).
+AI recommendations or assistant · exam communities · advanced personalisation · demand prediction · multi-branch or multi-library per owner · platform super admin · drag-and-drop floor-plan editor · waitlist and seat swap · native mobile apps · complex subscription billing · multiple payment gateways · advanced accounting or reconciliation · refund workflow · WhatsApp/SMS infrastructure · per-shift seat selling (D1) · owner approval of online (gateway) bookings (D3; direct UPI payments are approved by the owner, D20) · partial payments (D14) · phone-number login (D13) · owner verification/invites (D11) · hosted error tracking (D17) · QR or biometric attendance · student–owner chat · microservices, Kubernetes, Kafka, complex Redis · book cataloguing, payroll, canteen (SRS §1.2).
 
 ---
 
@@ -324,6 +338,7 @@ The recommended defaults were accepted for every open decision. They are now par
 | D12 | Library publishing | Auto-publish when the completeness rules are met. | LIB-07 |
 | D13 | Phone login | Email login only. | AUTH-14 |
 | D14 | Fee model | Dues are derived from membership dates. No partial payments. | PAY-13 |
+| D20 | Direct UPI payments with manual approval | **Approved for the pilot libraries (2026-11-08).** Students may pay the library owner's own UPI account; the owner verifies the payment by hand and approves or rejects. No gateway, no automatic verification, no LibraryHive commission, no LibraryHive subscription billing (the first month is free for the pilot libraries). The seat hold is not extended. The Razorpay code stays in place and is used by libraries that have not enabled UPI. | UPI-01 to UPI-12, BOOK-07 |
 | D17 | Logging maintenance, retention, error tracking | Logging kept: it is low-maintenance as scoped. Platform retention for app logs; audit rows kept indefinitely; no hosted error tracker. | §3.15 |
 
 Planning items still open (no effect on scope): D15, team member identities and unpushed work (Phase 7); D16, hosting budget and region (Phase 10).
@@ -338,7 +353,9 @@ Planning items still open (no effect on scope): D15, team member identities and 
 | Demo requests and photos are absent from the SRS | Newer approved requirement: **P0**. |
 | Shift booking (F1, SPEC) vs no shifts (SRS) | **D1**: full-day seats for the MVP. Per-shift selling is recorded as P2, not dropped silently. |
 | Payment gateway fixed as Razorpay (AGENTS, F1, SPEC) vs "evaluate" (brief) | Evaluated in Phase 2 (PAY-01 BLOCKED until then). |
-| Owner approve/reject booking (SRS §4.4) vs auto-confirm (brief) | **D3**: auto-confirm on verified payment. Owner control is kept through override and archival. |
+| Owner approve/reject booking (SRS §4.4) vs auto-confirm (brief) | **D3**: auto-confirm on verified payment. Owner control is kept through override and archival. **D20** is the one exception: a payment made directly to the owner by UPI cannot be verified by LibraryHive, so the owner approves it (UPI-07). |
+| "Multiple payment gateways" and "advanced accounting or reconciliation" out of scope vs direct UPI | **D20** adds no gateway and no reconciliation: money moves directly between student and owner, the owner confirms by hand, and the existing `Payment` ledger records only approved payments. |
+| Refunds excluded (PAY-14) vs rejected or seat-lost UPI payments | Unchanged: refunds are made by the owner directly, outside the system. The UI says so and never implies an automatic refund. |
 | Auto-link offline profile by phone or email (SPEC §6.2) vs "no unsafe matching" (brief) | Auto-link is **rejected**. Verified claim (OFF-04, D4). |
 | Logs not specified in the SRS | Added as approved requirement NEW-LOG (§3.15), building on SRS NFR-07 and AGENTS §8. |
 | Notification dedup key differs between documents | Recipient + membership + milestone + date (NOT-06). The final schema is set in Phase 3. |

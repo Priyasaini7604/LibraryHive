@@ -60,6 +60,12 @@ const FRIENDLY_MESSAGES: Record<string, string> = {
   FILE_TYPE: "Upload a JPG, PNG or WEBP image.",
   INVALID_SIGNATURE:
     "We couldn't verify this payment. If money was deducted it will be sorted out automatically; check My payments in a few minutes.",
+  DUPLICATE_UTR: "This UTR has already been submitted. Check the number, or contact the library.",
+  UPI_REQUEST_PENDING: "You already have a payment request waiting for this library. Cancel it first to send a new one.",
+  UPI_DISABLED: "This library is not taking UPI payments right now.",
+  ALREADY_DECIDED: "This request was already decided. Reload to see its status.",
+  QR_REQUIRED: "Turn UPI payments off or add a UPI ID before removing the QR code.",
+  HOLD_CLOSED: "This booking is no longer open. Please start again.",
   PAYMENT_NOT_PENDING: "This payment has already been completed or cancelled.",
   SEAT_LOST_REFUND_PENDING:
     "Your payment was received but the seat was no longer available. The library will refund you.",

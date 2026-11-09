@@ -33,7 +33,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), mode: "onBlur" });
 
-  const redirecting = useRedirectWhenSignedIn(user ? (next ?? homeFor(user.role)) : null);
+  const redirecting = useRedirectWhenSignedIn(user ? (next ?? homeFor(user.role, user.is_platform_admin)) : null);
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);

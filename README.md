@@ -21,6 +21,8 @@ A multi-tenant platform connecting study libraries and students: library discove
 | [AGENTS.md](AGENTS.md) | Engineering rules for developers and AI agents |
 | [PROJECT_AUDIT.md](PROJECT_AUDIT.md) | Audit of the code that existed before the approved design |
 
+The LibraryHive team also has a private, read-only analytics dashboard at `/platform` (a Django superuser with staff access; created with `python manage.py createsuperuser`). Details: [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md) 9.13b and [SPEC.md](SPEC.md) 4.12.
+
 ## Stack
 
 Django + Django REST Framework · Next.js (App Router, TypeScript, Tailwind) · PostgreSQL · Razorpay.

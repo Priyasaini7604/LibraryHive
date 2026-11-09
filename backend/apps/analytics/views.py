@@ -9,12 +9,12 @@ from apps.attendance import selectors as attendance_selectors
 from apps.core import audit
 from apps.core.dates import business_today
 from apps.core.pagination import StandardPagination
-from apps.core.permissions import HasLibrary, IsOwner, IsStudent
+from apps.core.permissions import HasLibrary, IsOwner, IsPlatformAdmin, IsStudent
 from apps.core.responses import ok
 from apps.memberships import selectors as membership_selectors
 from apps.payments import selectors as payment_selectors
 
-from . import exports, selectors, serializers
+from . import exports, platform_selectors, selectors, serializers
 
 OWNER = [IsAuthenticated, IsOwner, HasLibrary]
 
@@ -161,3 +161,60 @@ class StudentDashboardView(APIView):
     @extend_schema(responses={200: None})
     def get(self, request):
         return ok(serializers.student_dashboard_data(selectors.student_dashboard(request.user)))
+
+
+PLATFORM = [IsAuthenticated, IsPlatformAdmin]
+
+
+class PlatformOverviewView(APIView):
+    """Internal: platform-wide totals. LibraryHive team only (superuser + staff); owners and students get 403."""
+
+    permission_classes = PLATFORM
+
+    @extend_schema(responses={200: None})
+    def get(self, request):
+        return ok(platform_selectors.overview())
+
+
+class PlatformBookingsView(APIView):
+    """Internal: booking counts, trend, repeat rate, library distribution and abandoned holds."""
+
+    permission_classes = PLATFORM
+
+    @extend_schema(parameters=[serializers.PlatformRangeQuery], responses={200: None})
+    def get(self, request):
+        query = serializers.PlatformRangeQuery(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        return ok(platform_selectors.booking_analytics(values["from_"], values["to"], values["granularity"]))
+
+
+class PlatformLibrariesView(APIView):
+    """Internal: paginated per-library usage table (aggregates only, no personal data)."""
+
+    permission_classes = PLATFORM
+
+    @extend_schema(parameters=[serializers.PlatformLibrariesQuery], responses={200: None})
+    def get(self, request):
+        query = serializers.PlatformLibrariesQuery(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        queryset = platform_selectors.library_performance(
+            values["from_"], values["to"], search=values["search"], ordering=values["ordering"]
+        )
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        return paginator.get_paginated_response([platform_selectors.library_row(library) for library in page])
+
+
+class PlatformSubscriptionsView(APIView):
+    """Internal: subscription and revenue metrics that the data supports, plus the list of unavailable ones."""
+
+    permission_classes = PLATFORM
+
+    @extend_schema(parameters=[serializers.PlatformRangeQuery], responses={200: None})
+    def get(self, request):
+        query = serializers.PlatformRangeQuery(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        return ok(platform_selectors.subscription_analytics(values["from_"], values["to"]))

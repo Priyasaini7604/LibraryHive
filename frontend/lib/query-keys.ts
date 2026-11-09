@@ -1,6 +1,11 @@
 /** TanStack Query keys, one place so invalidation never misses a spelling (UI_ARCHITECTURE.md 9.3). */
 
 export const queryKeys = {
+  platformOverview: ["platform", "overview"] as const,
+  platformBookings: (filters: object) => ["platform", "bookings", filters] as const,
+  platformSubscriptions: (filters: object) => ["platform", "subscriptions", filters] as const,
+  platformLibraries: (filters: object) => ["platform", "libraries", filters] as const,
+
   domains: ["meta", "domains"] as const,
   amenities: ["meta", "amenities"] as const,
   libraries: (filters: object) => ["libraries", "list", filters] as const,

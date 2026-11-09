@@ -14,7 +14,8 @@ export function safeNextPath(next: string | null | undefined): string | null {
   return next;
 }
 
-export function homeFor(role: Role): string {
+export function homeFor(role: Role, isPlatformAdmin = false): string {
+  if (isPlatformAdmin) return "/platform";
   return role === "owner" ? "/owner" : "/student";
 }
 
@@ -76,6 +77,12 @@ export const OWNER_NAV: NavItem[] = [
   { href: "/owner/visits", label: "Visits", icon: "calendar" },
   { href: "/owner/library", label: "Library", icon: "building" },
   { href: "/owner/reports", label: "Reports", icon: "chart" },
+];
+
+/** Internal LibraryHive team area (never linked from owner or student navigation). */
+export const PLATFORM_NAV: NavItem[] = [
+  { href: "/platform", label: "Overview", icon: "chart", mobile: true },
+  { href: "/platform/libraries", label: "Libraries", icon: "building", mobile: true },
 ];
 
 /** Owner bottom bar: Inbox groups complaints and visits; More opens the full menu. */

@@ -55,7 +55,7 @@ export function RegisterForm() {
   });
   const role = useWatch({ control, name: "role" });
 
-  const redirecting = useRedirectWhenSignedIn(user ? homeFor(user.role) : null);
+  const redirecting = useRedirectWhenSignedIn(user ? homeFor(user.role, user.is_platform_admin) : null);
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);

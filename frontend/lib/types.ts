@@ -41,6 +41,8 @@ export interface User {
   role: Role;
   domain: Vocabulary | null;
   has_library?: boolean;
+  /** UI hint only: the LibraryHive team. The backend re-checks on every /platform call. */
+  is_platform_admin?: boolean;
   created_at: string;
 }
 

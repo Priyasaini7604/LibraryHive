@@ -27,6 +27,7 @@ import {
   type NavItem,
   OWNER_MOBILE_INBOX,
   OWNER_NAV,
+  PLATFORM_NAV,
   STUDENT_MENU,
   STUDENT_NAV,
   activeHref,
@@ -222,6 +223,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
                   Claim your account
                 </Link>
               </li>
+              <li>
+                <Link href="/privacy" className="text-slate-700 hover:text-slate-900">
+                  Privacy Policy
+                </Link>
+              </li>
             </ul>
           </nav>
         </div>
@@ -257,6 +263,39 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomBar items={STUDENT_NAV.filter((item) => item.mobile)} pathname={pathname} />
+    </div>
+  );
+}
+
+/** Internal LibraryHive team area: sidebar on desktop, bottom bar on phones. Separate from owner and student. */
+export function PlatformShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const active = activeHref(pathname, PLATFORM_NAV);
+  return (
+    <div className="flex min-h-dvh bg-slate-50">
+      <SkipLink />
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4 lg:flex print:hidden">
+        <Logo />
+        <p className="px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Internal analytics</p>
+        <nav aria-label="Platform" className="flex flex-col gap-1">
+          {PLATFORM_NAV.map((item) => (
+            <NavLink key={item.href} item={item} active={item.href === active} />
+          ))}
+        </nav>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="glass sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/10 px-4 sm:px-6 print:hidden">
+          <div className="lg:hidden">
+            <Logo />
+          </div>
+          <div className="flex-1" />
+          <UserMenu />
+        </header>
+        <main id="main" className="w-full flex-1 px-4 pb-24 pt-6 sm:px-6 lg:pb-10">
+          {children}
+        </main>
+      </div>
+      <BottomBar items={PLATFORM_NAV} pathname={pathname} />
     </div>
   );
 }

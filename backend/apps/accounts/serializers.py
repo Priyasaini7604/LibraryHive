@@ -41,6 +41,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        # UI hint only (routes the team to /platform); the backend re-checks IsPlatformAdmin on every call.
+        data["is_platform_admin"] = bool(instance.is_active and instance.is_staff and instance.is_superuser)
         if instance.role == User.Role.OWNER:
             data["has_library"] = getattr(instance, "library", None) is not None
         return data

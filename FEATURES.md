@@ -267,6 +267,18 @@
 | DASH-08 | Attendance summary on owner dashboard | NEW-L | P0 | NOT IMPLEMENTED | P4 | Today's check-ins and present now. |
 | DASH-09 | Advanced BI, demand prediction | Brief §4 | P2 | — | — | Excluded. |
 
+### 3.14b Internal platform analytics (D21)
+
+For the LibraryHive founding team to understand platform-wide usage and set subscription pricing. Read-only, aggregates only, no new tables.
+
+| ID | Feature | Source | Priority | Status | Owner | Acceptance criteria |
+|---|---|---|---|---|---|---|
+| PLAT-01 | Private analytics access for the LibraryHive team only | D21 | P0 | IMPLEMENTED | P4 | Active superuser with staff access, read from the database (never the JWT role). Anonymous 401; owners, students and staff without superuser 403; `/platform` is guarded in the frontend and the backend re-checks every call. |
+| PLAT-02 | Platform overview and booking analytics | D21 | P0 | IMPLEMENTED | P4 | Registered students and libraries, confirmed bookings, unique and monthly active students, repeat percent, daily/weekly/monthly trend, check-ins, abandoned holds kept separate from bookings, Asia/Kolkata date boundaries, custom ranges. A student with 10 bookings is 10 bookings and 1 student. |
+| PLAT-03 | Library performance table | D21 | P0 | IMPLEMENTED | P4 | Paginated, searchable, sortable, one query shape without double counting; library name and city only. |
+| PLAT-04 | Student payments kept apart from LibraryHive revenue | D21 | P0 | IMPLEMENTED | P4 | Gateway payments reported as payment health; manual UPI payments never mixed into them; subscription plan, MRR and platform revenue shown as unavailable and never estimated. |
+| PLAT-05 | Privacy: no personal data in analytics, and a public privacy page at `/privacy` | D21 | P0 | IMPLEMENTED | P4 | No student or owner name, email or phone in any response (tested). |
+
 ### 3.15 Logging and audit trail (new, approved after Phase 0)
 
 The application keeps **two kinds of logs** with different purposes:
@@ -314,7 +326,7 @@ If Phase 2 or the implementation finds otherwise, logging is reduced to LOG-01 t
 
 ## 4. Explicitly NOT in MVP (P2 / excluded)
 
-AI recommendations or assistant · exam communities · advanced personalisation · demand prediction · multi-branch or multi-library per owner · platform super admin · drag-and-drop floor-plan editor · waitlist and seat swap · native mobile apps · complex subscription billing · multiple payment gateways · advanced accounting or reconciliation · refund workflow · WhatsApp/SMS infrastructure · per-shift seat selling (D1) · owner approval of online (gateway) bookings (D3; direct UPI payments are approved by the owner, D20) · partial payments (D14) · phone-number login (D13) · owner verification/invites (D11) · hosted error tracking (D17) · QR or biometric attendance · student–owner chat · microservices, Kubernetes, Kafka, complex Redis · book cataloguing, payroll, canteen (SRS §1.2).
+AI recommendations or assistant · exam communities · advanced personalisation · demand prediction · multi-branch or multi-library per owner · platform super admin (an administration role or UI; the read-only analytics view for Django superusers is the one exception, D21) · drag-and-drop floor-plan editor · waitlist and seat swap · native mobile apps · complex subscription billing · multiple payment gateways · advanced accounting or reconciliation · refund workflow · WhatsApp/SMS infrastructure · per-shift seat selling (D1) · owner approval of online (gateway) bookings (D3; direct UPI payments are approved by the owner, D20) · partial payments (D14) · phone-number login (D13) · owner verification/invites (D11) · hosted error tracking (D17) · QR or biometric attendance · student–owner chat · microservices, Kubernetes, Kafka, complex Redis · book cataloguing, payroll, canteen (SRS §1.2).
 
 ---
 
@@ -339,6 +351,7 @@ The recommended defaults were accepted for every open decision. They are now par
 | D13 | Phone login | Email login only. | AUTH-14 |
 | D14 | Fee model | Dues are derived from membership dates. No partial payments. | PAY-13 |
 | D20 | Direct UPI payments with manual approval | **Approved for the pilot libraries (2026-11-08).** Students may pay the library owner's own UPI account; the owner verifies the payment by hand and approves or rejects. No gateway, no automatic verification, no LibraryHive commission, no LibraryHive subscription billing (the first month is free for the pilot libraries). The seat hold is not extended. The Razorpay code stays in place and is used by libraries that have not enabled UPI. | UPI-01 to UPI-12, BOOK-07 |
+| D21 | Internal platform analytics dashboard | **Approved (mentor requirement).** A private, read-only dashboard at `/platform` for Django superusers (staff and superuser, checked in the database). No new role, table, billing or admin UI. Student payments are never reported as LibraryHive revenue; subscription and MRR metrics stay unavailable until a library subscription model is approved. | PLAT-01 to PLAT-05 |
 | D17 | Logging maintenance, retention, error tracking | Logging kept: it is low-maintenance as scoped. Platform retention for app logs; audit rows kept indefinitely; no hosted error tracker. | §3.15 |
 
 Planning items still open (no effect on scope): D15, team member identities and unpushed work (Phase 7); D16, hosting budget and region (Phase 10).
@@ -353,6 +366,7 @@ Planning items still open (no effect on scope): D15, team member identities and 
 | Demo requests and photos are absent from the SRS | Newer approved requirement: **P0**. |
 | Shift booking (F1, SPEC) vs no shifts (SRS) | **D1**: full-day seats for the MVP. Per-shift selling is recorded as P2, not dropped silently. |
 | Payment gateway fixed as Razorpay (AGENTS, F1, SPEC) vs "evaluate" (brief) | Evaluated in Phase 2 (PAY-01 BLOCKED until then). |
+| "Platform super admin" listed as out of scope vs the internal analytics dashboard | **D21** adds one read-only analytics view for Django superusers. It adds no role to `User.Role`, no administration screens and no write access; the broader platform super admin stays out of scope. |
 | Owner approve/reject booking (SRS §4.4) vs auto-confirm (brief) | **D3**: auto-confirm on verified payment. Owner control is kept through override and archival. **D20** is the one exception: a payment made directly to the owner by UPI cannot be verified by LibraryHive, so the owner approves it (UPI-07). |
 | "Multiple payment gateways" and "advanced accounting or reconciliation" out of scope vs direct UPI | **D20** adds no gateway and no reconciliation: money moves directly between student and owner, the owner confirms by hand, and the existing `Payment` ledger records only approved payments. |
 | Refunds excluded (PAY-14) vs rejected or seat-lost UPI payments | Unchanged: refunds are made by the owner directly, outside the system. The UI says so and never implies an automatic refund. |

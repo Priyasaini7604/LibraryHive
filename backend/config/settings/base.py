@@ -210,6 +210,7 @@ REST_FRAMEWORK = {
         "password_reset_email": "3/10min",
         "hold_create": "10/min",
         "upload": "30/hour",
+        "upi_submit": "20/hour",
         "webhook": "120/min",
         "export": "30/hour",
         "job_trigger": "30/hour",
@@ -314,6 +315,8 @@ LOGGING = {
 }
 
 # --- Business configuration (SPEC.md section 6) -----------------------------------
+# A direct UPI payment request that waits longer than this is shown as overdue to both sides (never auto-decided).
+UPI_REVIEW_TARGET_HOURS = config("UPI_REVIEW_TARGET_HOURS", default=24, cast=int)
 SEAT_HOLD_MINUTES = config("SEAT_HOLD_MINUTES", default=15, cast=int)
 MEMBERSHIP_DUE_WINDOW_DAYS = config("MEMBERSHIP_DUE_WINDOW_DAYS", default=3, cast=int)
 RENEWAL_RESTART_AFTER_OVERDUE_DAYS = config("RENEWAL_RESTART_AFTER_OVERDUE_DAYS", default=15, cast=int)

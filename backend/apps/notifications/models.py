@@ -33,6 +33,9 @@ class Notification(BaseModel):
         ACCOUNT_CLAIMED = "account_claimed", "Account claimed"
         HOLD_RELEASED = "hold_released", "Seat hold released"
         MEMBERSHIP_ARCHIVED = "membership_archived", "Membership ended"
+        UPI_PAYMENT_SUBMITTED = "upi_payment_submitted", "UPI payment submitted"
+        UPI_PAYMENT_APPROVED = "upi_payment_approved", "UPI payment approved"
+        UPI_PAYMENT_REJECTED = "upi_payment_rejected", "UPI payment rejected"
 
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="notifications")
     type = models.CharField(max_length=40, choices=Type.choices)

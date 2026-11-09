@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { HoldCountdown } from "@/components/booking/hold-countdown";
 import { PaymentOutcome } from "@/components/booking/payment-outcome";
+import { UpiPayPanel } from "@/components/payments/upi-pay-panel";
 import { usePaymentFlow } from "@/components/booking/use-payment-flow";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/overlay";
@@ -137,7 +138,32 @@ export function CheckoutScreen({ holdId }: { holdId: string }) {
 
       <PaymentOutcome state={state} seatLabel={hold?.seat.label} libraryHref={libraryHref} successTitle="Your seat is booked" />
 
-      {hold && payable && (
+      {hold && payable && hold.library.upi_enabled && (
+        <>
+          <UpiPayPanel
+            libraryId={hold.library.id}
+            source={{ hold: holdId }}
+            amount={hold.amount}
+            holdNote="The seat is held only for the time left on the timer. If it runs out before the library approves, the seat is given to you only if nobody else has taken it."
+          />
+          <Button variant="secondary" className="self-start" onClick={() => setConfirmingCancel(true)}>
+            Cancel booking
+          </Button>
+        </>
+      )}
+
+      {hold && payable && !hold.library.upi_enabled && hold.library.gateway_enabled === false && (
+        <>
+          <Alert tone="warning" title="This library is not taking online payments yet">
+            Online payment is not available right now. Contact the library to book this seat, or cancel and choose another library.
+          </Alert>
+          <Button variant="secondary" className="self-start" onClick={() => setConfirmingCancel(true)}>
+            Cancel booking
+          </Button>
+        </>
+      )}
+
+      {hold && payable && !hold.library.upi_enabled && hold.library.gateway_enabled !== false && (
         <div className="flex flex-wrap items-center gap-3">
           <Button size="lg" onClick={() => void flow.start()}>
             {state.kind === "ready" ? `Pay ${formatMoney(hold.amount)}` : "Try again"}

@@ -26,6 +26,11 @@ def unsafe_settings_errors(
     allowed_hosts: list[str],
     cors_allowed_origins: list[str],
     environment: str,
+    storage_backend: str,
+    public_bucket: str,
+    private_bucket: str,
+    aws_access_key_id: str,
+    aws_secret_access_key: str,
     razorpay_key_id: str = "",
     email_notifications_enabled: bool = False,
     email_backend: str = "",
@@ -45,6 +50,31 @@ def unsafe_settings_errors(
         errors.append("CORS_ALLOWED_ORIGINS must list explicit origins (no '*').")
     if environment == "production" and razorpay_key_id.startswith("rzp_test_"):
         errors.append("Razorpay test keys must not be used when ENVIRONMENT=production.")
+    if environment == "production":
+        # Hosts such as Render and Railway have an ephemeral disk: a file written there is gone at the next
+        # deploy. QR codes, payment screenshots and library photos must live in object storage.
+        if storage_backend != "s3":
+            errors.append(
+                "STORAGE_BACKEND must be 's3' in production: local files are lost at every deploy on an ephemeral disk."
+            )
+        else:
+            missing = [
+                name
+                for name, value in (
+                    ("AWS_STORAGE_BUCKET_NAME", public_bucket),
+                    ("AWS_PRIVATE_BUCKET_NAME", private_bucket),
+                    ("AWS_ACCESS_KEY_ID", aws_access_key_id),
+                    ("AWS_SECRET_ACCESS_KEY", aws_secret_access_key),
+                )
+                if not (value or "").strip()
+            ]
+            if missing:
+                errors.append(f"STORAGE_BACKEND=s3 needs {', '.join(missing)}.")
+            elif public_bucket == private_bucket:
+                errors.append(
+                    "AWS_PRIVATE_BUCKET_NAME must be a different bucket from AWS_STORAGE_BUCKET_NAME: "
+                    "payment screenshots and QR codes must never share the public bucket."
+                )
     if email_notifications_enabled and email_backend in NON_DELIVERING_EMAIL_BACKENDS:
         errors.append(
             "EMAIL_NOTIFICATIONS_ENABLED needs a real EMAIL_BACKEND; "

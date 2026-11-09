@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { PaymentOutcome } from "@/components/booking/payment-outcome";
 import { usePaymentFlow } from "@/components/booking/use-payment-flow";
 import { useLeaveWarning } from "@/components/booking/checkout-screen";
+import { UpiPayPanel } from "@/components/payments/upi-pay-panel";
 import { Button } from "@/components/ui/button";
 import { RadioCardGroup } from "@/components/ui/choice";
 import { Page, PageHeader } from "@/components/ui/page";
@@ -129,7 +130,21 @@ export function RenewalScreen({ membershipId }: { membershipId: string }) {
 
       <PaymentOutcome state={state} seatLabel={current.seat.label} libraryHref={`/libraries/${current.library.id}`} successTitle="Your membership is renewed" />
 
-      {payable && (
+      {payable && current.library.upi_enabled && current.renewal_open && (
+        <UpiPayPanel
+          libraryId={current.library.id}
+          source={{ membership: membershipId, plan: planId && planId !== current.plan.id ? planId : undefined }}
+          amount={plan.price}
+        />
+      )}
+
+      {payable && !current.library.upi_enabled && current.library.gateway_enabled === false && (
+        <Alert tone="warning" title="This library is not taking online payments yet">
+          Online renewal is not available right now. Please contact the library to renew.
+        </Alert>
+      )}
+
+      {payable && !current.library.upi_enabled && current.library.gateway_enabled !== false && (
         <Button size="lg" className="self-start" disabled={!current.renewal_open} onClick={() => void flow.start()}>
           {state.kind === "ready" ? `Pay ${formatMoney(plan.price)}` : "Try again"}
         </Button>

@@ -439,6 +439,27 @@ def create_booking_hold(*, student, seat_id, plan_id) -> SeatHold:
 | 48 | POST `/owner/members/{membership_id}/renewals/` | owner+lib | Record an offline renewal payment [PAY-07, MEM-05] | `{method:"cash"\|"upi_direct"\|"bank_transfer", plan_id?, paid_at?, notes?}` | 201 `{payment, membership}` | Membership lock. `state=active`. Amount = plan price (server-side). Period per D5 (SPEC §4.3). Receipt number from the sequence. `recorded_by` is the owner. `paid_at` ≤ now and ≥ now − 30 days (default now). Audited and notified. | 409 `MEMBERSHIP_ARCHIVED`, `PLAN_INACTIVE` |
 | 49 | GET `/owner/dues/` | owner+lib | Due and overdue list [PAY-10/11] | query `status?` = `due`\|`overdue`, `bucket?` = `1-7`\|`8-15`\|`15+` (P1), `page` | paginated `[{membership_id, student:{name, phone}, seat_label, plan:{name, price}, next_due_date, days_overdue, amount_due}]`, sorted by `days_overdue` descending | Derived from `next_due_date` (D14). `amount_due` = current plan price × the number of periods overdue (minimum 1) | — |
 
+### 9.7b Direct UPI payments with manual approval (`payments`), D20
+
+Implemented in `apps/payments/upi_services.py`, `upi_selectors.py`, `upi_serializers.py` and `upi_views.py`; models `LibraryPaymentSettings` and `UpiPaymentRequest` (SPEC §3.11b-c, §4.3b). Not numbered in the original endpoint list.
+
+| Method & path | Auth | Purpose | Request | Errors |
+|---|---|---|---|---|
+| GET, PATCH `/owner/payment-settings/` | owner+lib | Read or change `upi_id`, `instructions`, `upi_enabled` | JSON | 400 (bad UPI ID, or enabling with no QR and no UPI ID) |
+| POST, DELETE `/owner/payment-settings/qr/` | owner+lib | Upload or replace (multipart `image`), or remove, the QR | multipart | 400 `FILE_TYPE`, 413 `FILE_TOO_LARGE`, 409 `QR_REQUIRED` |
+| GET `/student/libraries/{library_id}/upi-info/` | student | The library's QR link, UPI ID and instructions | n/a | 404 unless the student has a live hold or an active membership there and UPI is on |
+| POST `/student/upi-payments/` | student | Send a claim: `hold_id` **or** `membership_id` (+ `plan_id` for a renewal), `utr`, optional `note`, optional `screenshot` | multipart | 400, 404, 409 `DUPLICATE_UTR`, `UPI_REQUEST_PENDING`, `UPI_DISABLED`, `HOLD_CLOSED`, `ALREADY_MEMBER`, `PLAN_INACTIVE`, `RENEWAL_NOT_OPEN` |
+| GET `/student/upi-payments/`, `/{id}/` | student | Own requests with status, decision note and the library's contact details | n/a | 404 |
+| POST `/student/upi-payments/{id}/cancel/` | student | Withdraw a pending request | n/a | 409 `ALREADY_DECIDED` |
+| GET `/student/upi-payments/{id}/screenshot/` | student | Short-lived link to the student's own screenshot | n/a | 404 |
+| GET `/owner/upi-payments/` (`?status=`), `/{id}/`, `/summary/` | owner+lib | The library's requests, one request, the pending count | n/a | 404 for another library |
+| POST `/owner/upi-payments/{id}/approve/` | owner+lib | Approve; optional `seat_id` for another free seat | JSON | 409 `SEAT_UNAVAILABLE`, `ALREADY_DECIDED`, `ALREADY_MEMBER`, `MEMBERSHIP_ARCHIVED` |
+| POST `/owner/upi-payments/{id}/reject/` | owner+lib | Reject with `reason` (3 to 300 characters) | JSON | 400, 409 `ALREADY_DECIDED` |
+| GET `/owner/upi-payments/{id}/screenshot/` | owner+lib | Short-lived link to the screenshot | n/a | 404 |
+| GET `/files/private/{token}/` | signed token | Serves one private image **locally only**; 404 when `STORAGE_BACKEND=s3` | n/a | 404 |
+
+`GET /owner/upi-payments/summary/` returns `{pending, overdue}` for the owner's navigation badge. Every request payload carries `waiting_hours` and `overdue` (pending requests older than `UPI_REVIEW_TARGET_HOURS`, default 24); nothing is decided automatically (SPEC §4.3b). The student hold (`GET /student/holds/current/`) and membership payloads carry `library.upi_enabled` so the checkout and renewal screens know to offer UPI instead of the gateway, and `library.gateway_enabled` (false when no gateway keys are configured) so they hide the gateway button. Notification types `upi_payment_submitted`, `upi_payment_approved`, `upi_payment_rejected` use the dedup keys in SPEC §4.5.
+
 ### 9.8 Memberships and offline admission (`memberships`, `accounts`)
 
 | # | Method & path | Auth | Purpose | Request | Response `data` | Validation / rules | Errors |

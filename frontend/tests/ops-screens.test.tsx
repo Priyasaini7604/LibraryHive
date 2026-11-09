@@ -392,6 +392,8 @@ describe("notifications", () => {
     expect(notificationTarget(notification({ entity_type: "library", entity_id: "l1" }), "student")).toBe("/libraries/l1");
     expect(notificationTarget(notification({ entity_type: "library", entity_id: "l1" }), "owner")).toBe("/owner/dues");
     expect(notificationTarget(notification({ entity_type: "library", entity_id: "l1" }), "owner")).toBe("/owner/dues");
+    expect(notificationTarget(notification({ entity_type: "upi_payment_request", entity_id: "r1" }), "owner")).toBe("/owner/payments/upi");
+    expect(notificationTarget(notification({ entity_type: "upi_payment_request", entity_id: "r1" }), "student")).toBe("/student/payments/upi");
     expect(notificationTarget(notification({ entity_type: null, entity_id: null }), "student")).toBeNull();
     expect(notificationTarget(notification({ entity_type: "unknown", entity_id: "x" }), "student")).toBeNull();
   });

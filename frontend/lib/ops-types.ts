@@ -44,7 +44,9 @@ export interface OwnerSeat {
 export interface StudentHold {
   id: string;
   seat: { id: string; label: string };
-  library: { id: string; name: string };
+  /** `upi_enabled`: the library takes direct UPI payments (the checkout offers it instead of the gateway).
+   * `gateway_enabled`: false when no gateway keys are configured, so the gateway button is hidden. */
+  library: { id: string; name: string; upi_enabled?: boolean; gateway_enabled?: boolean };
   plan: { id: string; name: string; duration_days: number; price: string };
   amount: string;
   expires_at: string;
@@ -61,7 +63,7 @@ export type PaymentPurpose = "new_membership" | "renewal";
 
 export interface StudentMembership {
   id: string;
-  library: { id: string; name: string };
+  library: { id: string; name: string; upi_enabled?: boolean; gateway_enabled?: boolean };
   seat: { label: string };
   plan: { id: string; name: string; price: string; duration_days: number };
   source: MembershipSource;

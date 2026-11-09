@@ -287,6 +287,13 @@ describe("RenewalScreen", () => {
     expect(await screen.findByText("Your membership is renewed")).toBeInTheDocument();
   });
 
+  it("hides the gateway button and explains when the gateway is not configured", async () => {
+    mocks.fetchStudentMembership.mockResolvedValue(membership({ library: { id: "lib1", name: "Silent Hive", gateway_enabled: false } }));
+    renderWithClient(<RenewalScreen membershipId="m1" />);
+    expect(await screen.findByText("This library is not taking online payments yet")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Pay ₹/ })).not.toBeInTheDocument();
+  });
+
   it("lets the student switch plan and shows that plan's price", async () => {
     mocks.createRenewalOrder.mockResolvedValue(order);
     captureWindow();

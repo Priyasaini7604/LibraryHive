@@ -118,6 +118,15 @@ class RazorpayGateway(HmacVerification):
 _override: PaymentGateway | None = None
 
 
+def is_configured() -> bool:
+    """True when online payments can work: a test gateway is installed, or both Razorpay keys are set.
+
+    The checkout screens hide the card/UPI-app gateway button when this is False, so a student is never
+    sent to a payment that cannot start. It does not change how a configured gateway behaves.
+    """
+    return _override is not None or bool(settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET)
+
+
 def get_gateway() -> PaymentGateway:
     """The gateway services use. Tests install a fake with `use_gateway()`."""
     return _override or RazorpayGateway()

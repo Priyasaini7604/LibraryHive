@@ -6,12 +6,17 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *
 from .base import (
     ALLOWED_HOSTS,
+    AWS_ACCESS_KEY_ID,
+    AWS_PRIVATE_BUCKET_NAME,
+    AWS_SECRET_ACCESS_KEY,
+    AWS_STORAGE_BUCKET_NAME,
     CORS_ALLOWED_ORIGINS,
     EMAIL_BACKEND,
     ENVIRONMENT,
     MIDDLEWARE,
     SECRET_KEY,
     SIMPLE_JWT,
+    STORAGE_BACKEND,
     STORAGES,
 )
 from .guard import unsafe_settings_errors
@@ -31,6 +36,11 @@ _errors = unsafe_settings_errors(
     allowed_hosts=list(ALLOWED_HOSTS),
     cors_allowed_origins=list(CORS_ALLOWED_ORIGINS),
     environment=ENVIRONMENT,
+    storage_backend=STORAGE_BACKEND,
+    public_bucket=AWS_STORAGE_BUCKET_NAME,
+    private_bucket=AWS_PRIVATE_BUCKET_NAME,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
     razorpay_key_id=config("RAZORPAY_KEY_ID", default=""),
     email_notifications_enabled=EMAIL_NOTIFICATIONS_ENABLED,
     email_backend=EMAIL_BACKEND,
@@ -41,6 +51,9 @@ if _errors:
 # HTTPS behind the platform proxy (SECURITY.md section 11).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+# The platform health probe (Railway, Render) calls the container over plain http with no forwarded protocol header,
+# so it would be redirected and judged unhealthy. Only the health path is exempt; it reveals no data.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$"]
 SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=0, cast=int)  # enable after HTTPS is verified
 SECURE_HSTS_INCLUDE_SUBDOMAINS = config("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False, cast=bool)
 SESSION_COOKIE_SECURE = True

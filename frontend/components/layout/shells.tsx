@@ -3,6 +3,7 @@
 import { LogOut, Menu as MenuIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -18,8 +19,10 @@ import {
   SheetContent,
 } from "@/components/ui/overlay";
 import { Avatar } from "@/components/ui/surface";
+import { fetchOwnerUpiSummary } from "@/lib/api/upi";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
+import { queryKeys } from "@/lib/query-keys";
 import {
   type NavItem,
   OWNER_MOBILE_INBOX,
@@ -56,16 +59,29 @@ function Logo() {
   );
 }
 
+/** Owner payments waiting for a decision. Silent on any error: the badge is a convenience, not a gate. */
+function usePendingUpi() {
+  const query = useQuery({
+    queryKey: queryKeys.ownerUpiSummary,
+    queryFn: fetchOwnerUpiSummary,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  return query.data ?? null;
+}
+
 function NavLink({
   item,
   active,
   compact = false,
   onNavigate,
+  badge,
 }: {
   item: NavItem;
   active: boolean;
   compact?: boolean;
   onNavigate?: () => void;
+  badge?: { count: number; urgent: boolean; label: string };
 }) {
   return (
     <Link
@@ -80,6 +96,17 @@ function NavLink({
     >
       <NavIcon name={item.icon} className={compact ? "size-5" : "size-4"} />
       {item.label}
+      {badge && badge.count > 0 && (
+        <span
+          className={cn(
+            "ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white",
+            badge.urgent ? "bg-red-600" : "bg-blue-600",
+          )}
+        >
+          <span aria-hidden="true">{badge.count > 99 ? "99+" : badge.count}</span>
+          <span className="sr-only">{`${badge.count} ${badge.label}`}</span>
+        </span>
+      )}
     </Link>
   );
 }
@@ -240,6 +267,11 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const active = activeHref(pathname, OWNER_NAV);
   const mobileItems = [...OWNER_NAV.filter((item) => item.mobile), OWNER_MOBILE_INBOX];
+  const upi = usePendingUpi();
+  const badgeFor = (item: NavItem) =>
+    item.href === "/owner/payments" && upi
+      ? { count: upi.pending, urgent: upi.overdue > 0, label: upi.overdue > 0 ? "UPI payments waiting, some overdue" : "UPI payments waiting for your decision" }
+      : undefined;
 
   return (
     <div className="flex min-h-dvh bg-slate-50">
@@ -248,7 +280,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
         <Logo />
         <nav aria-label="Owner" className="flex flex-col gap-1">
           {OWNER_NAV.map((item) => (
-            <NavLink key={item.href} item={item} active={item.href === active} />
+            <NavLink key={item.href} item={item} active={item.href === active} badge={badgeFor(item)} />
           ))}
         </nav>
       </aside>
@@ -283,6 +315,7 @@ export function OwnerShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     item={item}
                     active={item.href === active}
+                    badge={badgeFor(item)}
                     onNavigate={() => setMoreOpen(false)}
                   />
                 ))}

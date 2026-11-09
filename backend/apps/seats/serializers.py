@@ -2,6 +2,8 @@
 
 from rest_framework import serializers
 
+from apps.payments import selectors as payment_selectors
+
 from .models import Seat, SeatHold
 from .services import MAX_SEATS_PER_REQUEST
 
@@ -128,7 +130,15 @@ class StudentHoldSerializer(serializers.ModelSerializer):
         return {"id": str(hold.seat_id), "label": hold.seat.label}
 
     def get_library(self, hold) -> dict:
-        return {"id": str(hold.library_id), "name": hold.library.name}
+        # `upi_enabled` tells the checkout screen whether to offer the library's direct UPI payment.
+        settings_row = getattr(hold.library, "payment_settings", None)
+        return {
+            "id": str(hold.library_id),
+            "name": hold.library.name,
+            "upi_enabled": bool(settings_row and settings_row.upi_enabled),
+            # False when no gateway keys are configured: the checkout then hides the gateway button.
+            "gateway_enabled": payment_selectors.online_payments_available(),
+        }
 
     def get_plan(self, hold) -> dict:
         plan = hold.plan

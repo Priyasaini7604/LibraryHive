@@ -5,6 +5,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from apps.accounts.phone import mask_email, mask_phone
+from apps.payments import selectors as payment_selectors
 from apps.payments.models import Payment
 
 from . import selectors
@@ -161,7 +162,13 @@ def student_membership_row(membership: Membership) -> dict:
     plan = membership.plan
     return {
         "id": str(membership.pk),
-        "library": {"id": str(membership.library_id), "name": membership.library.name},
+        "library": {
+            "id": str(membership.library_id),
+            "name": membership.library.name,
+            # `upi_enabled` tells the renewal screen whether to offer the library's direct UPI payment.
+            "upi_enabled": bool(getattr(getattr(membership.library, "payment_settings", None), "upi_enabled", False)),
+            "gateway_enabled": payment_selectors.online_payments_available(),
+        },
         "seat": {"label": membership.seat.label},
         "plan": {"id": str(plan.pk), "name": plan.name, "price": str(plan.price), "duration_days": plan.duration_days},
         "source": membership.source,

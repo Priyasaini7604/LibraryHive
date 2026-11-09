@@ -88,7 +88,7 @@ MEMBER_STATUSES = (ACTIVE, DUE, OVERDUE, ARCHIVED)
 
 
 def _with_status(queryset: QuerySet[Membership]) -> QuerySet[Membership]:
-    return annotate_status(queryset.select_related("student__domain", "seat", "plan", "library"))
+    return annotate_status(queryset.select_related("student__domain", "seat", "plan", "library__payment_settings"))
 
 
 def owner_members(

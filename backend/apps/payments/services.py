@@ -396,6 +396,7 @@ def record_offline_payment(
     period_end,
     paid_at=None,
     notes: str = "",
+    notify: bool = True,
 ) -> Payment:
     """Write the successful offline payment an owner took in person (PAY-07, SPEC.md 4.3).
 
@@ -442,14 +443,15 @@ def record_offline_payment(
         "Offline payment recorded",
         extra={"payment_id": str(payment.pk), "membership_id": str(membership.pk), "owner_id": str(recorded_by.pk)},
     )
-    notifications.notify(
-        recipient=membership.student,
-        type="payment_received",
-        title="Payment recorded",
-        body=f"{membership.library.name} recorded your payment of {payment.amount}.",
-        dedup_key=f"payment:{payment.pk}:payment_received:{membership.student_id}",
-        entity=("payment", payment.pk),
-    )
+    if notify:  # a caller that sends its own, richer message (UPI approval) passes notify=False
+        notifications.notify(
+            recipient=membership.student,
+            type="payment_received",
+            title="Payment recorded",
+            body=f"{membership.library.name} recorded your payment of {payment.amount}.",
+            dedup_key=f"payment:{payment.pk}:payment_received:{membership.student_id}",
+            entity=("payment", payment.pk),
+        )
     return payment
 
 

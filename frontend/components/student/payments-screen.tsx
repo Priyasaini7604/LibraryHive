@@ -22,7 +22,15 @@ export function PaymentsScreen() {
 
   return (
     <Page>
-      <PageHeader title="My payments" description="Receipts for everything you've paid, and payments still being confirmed." />
+      <PageHeader
+        title="My payments"
+        description="Receipts for everything you've paid, and payments still being confirmed."
+        actions={
+          <Button asChild variant="secondary">
+            <Link href="/student/payments/upi">My UPI payment requests</Link>
+          </Button>
+        }
+      />
       {query.isPending ? (
         <LoadingList label="Loading your payments" />
       ) : query.isError ? (

@@ -93,6 +93,40 @@ def activate_from_hold(*, hold, start_date: date) -> Membership:
     return membership
 
 
+def activate_for_manual_payment(*, student, library, seat, plan, start_date: date, owner) -> Membership:
+    """Create the active membership an owner-approved direct UPI payment pays for (UPI-04).
+
+    Like `activate_from_hold`, but the seat is chosen by the caller (the booked seat or an alternative the owner
+    picked) and there is no hold to complete. The caller holds the seat row lock and has checked that the seat
+    and the student are free; the partial uniques still decide a race (IntegrityError). The booking came from
+    the student's own request, so it counts as an online booking; the owner's approval is audited by the caller.
+    """
+    membership = Membership.objects.create(
+        student=student,
+        library=library,
+        seat=seat,
+        plan=plan,
+        source=Membership.Source.ONLINE,
+        state=Membership.State.ACTIVE,
+        start_date=start_date,
+        next_due_date=start_date + timedelta(days=plan.duration_days),
+        created_by=student,
+    )
+    audit.record(
+        actor=owner,
+        action="membership.create",
+        entity_type="membership",
+        entity_id=membership.pk,
+        library=library,
+        changes={"seat": seat.label, "plan": plan.name, "source": "online", "via": "upi_approval"},
+    )
+    logger.info(
+        "Membership activated from approved UPI payment",
+        extra={"membership_id": str(membership.pk), "student_id": str(student.pk), "owner_id": str(owner.pk)},
+    )
+    return membership
+
+
 # --- Shared renewal rules ------------------------------------------------------------------------------------
 
 

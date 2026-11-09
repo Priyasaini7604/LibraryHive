@@ -185,6 +185,7 @@ export interface LibraryFilters {
 }
 
 export * from "./ops-types";
+export * from "./upi-types";
 
 /** How a student proves they own an offline record (#12). */
 export type ClaimChannel = "email_otp" | "owner_code";

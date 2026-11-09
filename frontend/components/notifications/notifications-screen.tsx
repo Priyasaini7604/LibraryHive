@@ -29,6 +29,7 @@ export function notificationTarget(notification: AppNotification, role: Role): s
     if (type === "complaint") return `/student/complaints/${id}`;
     if (type === "visit") return "/student/visits";
     if (type === "library") return `/libraries/${id}`;
+    if (type === "upi_payment_request") return "/student/payments/upi";
     return null;
   }
   if (type === "membership") return `/owner/members/${id}`;
@@ -36,6 +37,7 @@ export function notificationTarget(notification: AppNotification, role: Role): s
   if (type === "complaint") return `/owner/complaints/${id}`;
   if (type === "visit") return "/owner/visits";
   if (type === "library") return "/owner/dues";
+  if (type === "upi_payment_request") return "/owner/payments/upi";
   return null;
 }
 

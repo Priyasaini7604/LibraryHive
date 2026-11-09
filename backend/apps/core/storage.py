@@ -30,9 +30,27 @@ def random_key(prefix: str, extension: str, *, suffix: str = "") -> str:
     return f"{clean_prefix}/{uuid.uuid4().hex}{suffix}.{extension.lstrip('.')}"
 
 
+IMAGE_CONTENT_TYPES = {"webp": "image/webp", "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
+
+
+def content_type_for_key(key: str) -> str | None:
+    """Image content type from the key's extension, or None for anything else."""
+    return IMAGE_CONTENT_TYPES.get(key.rsplit(".", 1)[-1].lower()) if "." in key else None
+
+
 def save_bytes(storage: Storage, key: str, data: bytes) -> str:
-    """Store bytes under `key` and return the key actually used."""
-    return storage.save(key, ContentFile(data))
+    """Store bytes under `key` and return the key actually used.
+
+    The content type is stated explicitly. django-storages otherwise guesses it from the file name with Python's
+    `mimetypes`, which does not know `.webp` before Python 3.13 (nor on a host without a mime.types file); the
+    upload would then go out as `application/octet-stream`, which Supabase Storage refuses with HTTP 415 and which
+    would make a public photo download instead of display.
+    """
+    content = ContentFile(data)
+    content_type = content_type_for_key(key)
+    if content_type:
+        content.content_type = content_type  # read by S3Storage; ignored by the filesystem storage
+    return storage.save(key, content)
 
 
 PRIVATE_FILE_SALT = "libraryhive.private-file"

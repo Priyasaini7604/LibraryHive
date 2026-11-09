@@ -34,6 +34,9 @@ def unsafe_settings_errors(
     razorpay_key_id: str = "",
     email_notifications_enabled: bool = False,
     email_backend: str = "",
+    aws_endpoint_url: str = "",
+    aws_region_name: str = "",
+    media_public_base_url: str = "",
 ) -> list[str]:
     errors: list[str] = []
     if debug:
@@ -75,6 +78,25 @@ def unsafe_settings_errors(
                     "AWS_PRIVATE_BUCKET_NAME must be a different bucket from AWS_STORAGE_BUCKET_NAME: "
                     "payment screenshots and QR codes must never share the public bucket."
                 )
+            if (aws_endpoint_url or "").strip():
+                # A custom endpoint means an S3-compatible provider (Supabase, R2, MinIO). Presigned links are
+                # signed for one region, and botocore would otherwise guess us-east-1: the private links would
+                # then fail with SignatureDoesNotMatch.
+                if not (aws_region_name or "").strip():
+                    errors.append(
+                        "AWS_S3_REGION_NAME is required when AWS_S3_ENDPOINT_URL is set (for example ap-south-1)."
+                    )
+                if not aws_endpoint_url.strip().lower().startswith("https://"):
+                    errors.append("AWS_S3_ENDPOINT_URL must start with https://.")
+                # The provider's S3 endpoint needs credentials; public photos are served from another URL.
+                base = (media_public_base_url or "").strip()
+                if not base:
+                    errors.append(
+                        "MEDIA_PUBLIC_BASE_URL is required when AWS_S3_ENDPOINT_URL is set: "
+                        "the full public URL prefix of the public bucket, including its path."
+                    )
+                elif not base.lower().startswith("https://"):
+                    errors.append("MEDIA_PUBLIC_BASE_URL must start with https://.")
     if email_notifications_enabled and email_backend in NON_DELIVERING_EMAIL_BACKENDS:
         errors.append(
             "EMAIL_NOTIFICATIONS_ENABLED needs a real EMAIL_BACKEND; "

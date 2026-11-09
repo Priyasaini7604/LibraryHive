@@ -11,6 +11,8 @@ from pathlib import Path
 import dj_database_url
 from decouple import Csv, config
 
+from .object_storage import s3_storages
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 ENVIRONMENT = config("ENVIRONMENT", default="local")
@@ -128,36 +130,29 @@ AWS_PRIVATE_BUCKET_NAME = config("AWS_PRIVATE_BUCKET_NAME", default="")
 AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default="") or None
 AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID", default="")
 AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="")
+AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="") or None
+# Path style and Signature V4 suit AWS and every S3-compatible provider used here (Supabase requires both).
+AWS_S3_ADDRESSING_STYLE = config("AWS_S3_ADDRESSING_STYLE", default="path")
+AWS_S3_SIGNATURE_VERSION = config("AWS_S3_SIGNATURE_VERSION", default="s3v4")
+# The complete public prefix of the public bucket, including its path (see config/settings/object_storage.py).
 MEDIA_PUBLIC_BASE_URL = config("MEDIA_PUBLIC_BASE_URL", default="")
 
 # Two media stores (ARCHITECTURE.md section 13): "public" for library photos
-# (served directly) and "private" for complaint images (signed URLs only).
+# (served directly) and "private" for UPI QR codes and payment screenshots (signed URLs only).
 if STORAGE_BACKEND == "s3":
-    _s3_common = {
-        "endpoint_url": AWS_S3_ENDPOINT_URL,
-        "access_key": AWS_ACCESS_KEY_ID,
-        "secret_key": AWS_SECRET_ACCESS_KEY,
-        "file_overwrite": False,
-        "default_acl": None,
-    }
-    _public_storage = {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            **_s3_common,
-            "bucket_name": AWS_STORAGE_BUCKET_NAME,
-            "querystring_auth": False,
-            "custom_domain": MEDIA_PUBLIC_BASE_URL.removeprefix("https://").rstrip("/") or None,
-        },
-    }
-    _private_storage = {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            **_s3_common,
-            "bucket_name": AWS_PRIVATE_BUCKET_NAME,
-            "querystring_auth": True,
-            "querystring_expire": 600,
-        },
-    }
+    _s3_stores = s3_storages(
+        public_bucket=AWS_STORAGE_BUCKET_NAME,
+        private_bucket=AWS_PRIVATE_BUCKET_NAME,
+        endpoint_url=AWS_S3_ENDPOINT_URL,
+        region_name=AWS_S3_REGION_NAME,
+        addressing_style=AWS_S3_ADDRESSING_STYLE,
+        signature_version=AWS_S3_SIGNATURE_VERSION,
+        access_key=AWS_ACCESS_KEY_ID,
+        secret_key=AWS_SECRET_ACCESS_KEY,
+        public_base_url=MEDIA_PUBLIC_BASE_URL,
+    )
+    _public_storage = _s3_stores["public"]
+    _private_storage = _s3_stores["private"]
 else:
     _public_storage = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

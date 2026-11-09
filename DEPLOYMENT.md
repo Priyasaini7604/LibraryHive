@@ -58,6 +58,7 @@ With `ENVIRONMENT=production` the app **will not start** (`ImproperlyConfigured`
 - `DEBUG` is on, `SECRET_KEY` or `JWT_SIGNING_KEY` is short or equal to the other, `ALLOWED_HOSTS` or `CORS_ALLOWED_ORIGINS` is empty or `*`.
 - A Razorpay test key (`rzp_test_…`) is set.
 - `STORAGE_BACKEND` is not `s3`, or `AWS_STORAGE_BUCKET_NAME`, `AWS_PRIVATE_BUCKET_NAME`, `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` is empty, or the private bucket equals the public bucket.
+- `AWS_S3_ENDPOINT_URL` is set (an S3-compatible provider such as Supabase) but it is not `https://`, `AWS_S3_REGION_NAME` is empty (private links would be signed for the wrong region), or `MEDIA_PUBLIC_BASE_URL` is empty or not `https://` (public photos have no readable address).
 
 `ENVIRONMENT=staging` keeps accepting local storage and test keys. The GitHub `ci.yml` check supplies obviously fake placeholder storage values for this reason.
 
@@ -84,9 +85,11 @@ With `ENVIRONMENT=production` the app **will not start** (`ImproperlyConfigured`
 | `STORAGE_BACKEND` | `s3` (required, see above) |
 | `AWS_STORAGE_BUCKET_NAME` | the **public** photos bucket |
 | `AWS_PRIVATE_BUCKET_NAME` | the **private** bucket (no public access, no listing) |
-| `AWS_S3_ENDPOINT_URL` | the provider's S3 endpoint (blank for AWS itself) |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | a key limited to those two buckets |
-| `MEDIA_PUBLIC_BASE_URL` | the public bucket's HTTPS base (CDN or bucket domain) |
+| `AWS_S3_ENDPOINT_URL` | the provider's S3 endpoint, copied exactly from its dashboard (blank for AWS itself). Supabase: Storage, S3 Configuration. |
+| `AWS_S3_REGION_NAME` | the provider's region, for example `ap-south-1`. Required whenever the endpoint is set. |
+| `AWS_S3_ADDRESSING_STYLE`, `AWS_S3_SIGNATURE_VERSION` | optional; default `path` and `s3v4`, which Supabase needs |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | the S3 access key pair from the provider; set only in Render's secret settings |
+| `MEDIA_PUBLIC_BASE_URL` | the **complete** public URL prefix of the public bucket, bucket path included, because the object key is appended to it. Supabase: `https://<project-ref>.supabase.co/storage/v1/object/public/<public-bucket>` (see section 6a). Must be `https://`. |
 | `UPI_REVIEW_TARGET_HOURS` | optional, default `24`: after this a pending UPI request is flagged overdue to the student and the owner (nothing is decided automatically) |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | only with live keys (blocker 3) |
 | `EMAIL_NOTIFICATIONS_ENABLED` | leave unset (off) |
@@ -131,13 +134,57 @@ Goal: prove, against the **real** provider, that the private bucket serves a QR 
 2. **Get the signed link.** The settings page and `GET /api/v1/owner/payment-settings/` return `qr_url`: a pre-signed URL that carries a signature and an expiry (`X-Amz-Expires=600` for signature version 4). Copy it from your browser's Network tab.
 3. **It works while valid.** From a terminal: `curl -sI "<url>"` returns `200` and `content-type: image/webp`. Open it in a private browser window too. Then scan the QR image from the page with a phone.
 4. **It is not guessable.** Change one character of the signature: expect `403` (`SignatureDoesNotMatch`). Remove the whole query string: expect `403` (`AccessDenied`).
-5. **It expires.** Wait 11 minutes and request the same URL: expect `403` (`Request has expired`). Reload the page: a new link is issued and works.
+5. **It expires.** Wait 11 minutes and request the same URL: expect `400` or `403` (Supabase answered `400` in the 2026-11-09 test). Reload the page: a new link is issued and works.
 6. **The bucket itself is private.** An anonymous request to the bucket root (`curl -s https://<endpoint>/<private-bucket>/`) must be `AccessDenied`, and so must a direct object URL without a signature. Also check the provider's console: no public access, no public-read policy or ACL on the private bucket.
 7. **Students and other owners.** As a student with a live hold at that library, open the checkout: the QR must display. As a student without a hold, `GET /api/v1/student/libraries/<id>/upi-info/` must be 404. Submit a UTR with a screenshot; another owner and another student must get 404 for that request's screenshot endpoint.
 8. **Browser policy.** In the browser's developer tools, confirm the image request goes to the origin listed in `MEDIA_ORIGIN` and the console shows no Content-Security-Policy violation. If the QR shows "could not be loaded", the usual cause is a private-bucket origin missing from `MEDIA_ORIGIN`.
 9. **Local-file route is off.** `GET /api/v1/files/private/anything/` must answer 404 when `STORAGE_BACKEND=s3`.
 
-If step 2 or 3 fails with a signature error, look at the provider's region and addressing style first: the settings pass the endpoint URL and keys but no region, so a bucket outside the provider's default region may need a region setting added. Record the exact error and fix it before the pilot.
+If step 2 or 3 fails with a signature error (`SignatureDoesNotMatch`), check `AWS_S3_REGION_NAME` first (it must be the provider's region, for example `ap-south-1`), then `AWS_S3_ENDPOINT_URL` (exactly as the dashboard shows it) and `AWS_S3_ADDRESSING_STYLE=path`. Record the exact error and fix it before the pilot.
+
+### 6a. Supabase Storage: setup and a safe provider test
+
+Status: verified against the real Supabase project (`libraryhive-storage`, `ap-south-1`) on 2026-11-09, all 16 checks PASS: public upload and anonymous GET, private upload, signed GET, unsigned and wrong-signature GET refused, private object not reachable through a public URL, `X-Amz-Expires=600` with SigV4 scope `ap-south-1`, link refused after a 610 second wait, and cleanup. This needs `save_bytes` to state the image content type (a first run failed with HTTP 415 `InvalidMimeType` because Python 3.12 cannot guess `.webp`). Repeat it whenever the keys, endpoint or region change.
+
+**Buckets.** `libraryhive-public` is a *public* bucket (library photos only). `libraryhive-private` is a *private* bucket (UPI QR codes, payment screenshots). Never turn the private one public. Supabase serves a public bucket's objects at `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>/<key>`; its S3 endpoint is different and always needs credentials.
+
+**Render variables** (values go only into Render's secret settings; never into git, chat, logs or screenshots):
+
+| Variable | Value |
+|---|---|
+| `STORAGE_BACKEND` | `s3` |
+| `AWS_STORAGE_BUCKET_NAME` | `libraryhive-public` |
+| `AWS_PRIVATE_BUCKET_NAME` | `libraryhive-private` |
+| `AWS_S3_ENDPOINT_URL` | the exact endpoint from Supabase, Storage, S3 Configuration |
+| `AWS_S3_REGION_NAME` | `ap-south-1` |
+| `AWS_S3_ADDRESSING_STYLE` / `AWS_S3_SIGNATURE_VERSION` | `path` / `s3v4` (the defaults) |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | the S3 key pair generated in Supabase |
+| `MEDIA_PUBLIC_BASE_URL` | `https://<project-ref>.supabase.co/storage/v1/object/public/libraryhive-public` (no trailing path after the bucket name) |
+
+Vercel `MEDIA_ORIGIN` needs **both** origins, comma separated: the public one (`https://<project-ref>.supabase.co`) and the host of `AWS_S3_ENDPOINT_URL` (the private links point at it). Without the second one the QR will not display.
+
+**Manual integration test.** Run it from your own machine with a throwaway shell, against the real project, with no production data. Load the keys without typing them into the command line (so they stay out of shell history), for example `read -rs AWS_SECRET_ACCESS_KEY && export AWS_SECRET_ACCESS_KEY`, and the same for `AWS_ACCESS_KEY_ID`. Also export `STORAGE_BACKEND=s3`, both bucket names, `AWS_S3_ENDPOINT_URL`, `AWS_S3_REGION_NAME`, `MEDIA_PUBLIC_BASE_URL` and the usual `SECRET_KEY`/`DATABASE_URL` that `manage.py` needs. Do not paste any output that contains a signed link or a key into chat.
+
+1. **Make a tiny WEBP.** `python -c "from PIL import Image; Image.new('RGB',(1,1),'white').save('lh-test.webp')"`. Use a key that cannot clash with real data: `zz-storage-test/<random>.webp`.
+2. **Upload one object to each bucket through the app's own storage code** (this tests the exact settings production uses). In `python manage.py shell`:
+   ```python
+   from apps.core.storage import public_storage, private_storage, save_bytes, random_key, private_file_url
+   data = open("lh-test.webp", "rb").read()
+   pub_key = save_bytes(public_storage(), random_key("zz-storage-test", "webp"), data)
+   prv_key = save_bytes(private_storage(), random_key("zz-storage-test", "webp"), data)
+   pub_url = public_storage().url(pub_key)
+   prv_url = private_file_url(prv_key)
+   print(pub_key, prv_key)   # keys are safe to print; do not print prv_url or pub_url into shared places
+   ```
+   Both calls must succeed. Confirm in the Supabase dashboard that `pub_key` is in `libraryhive-public` and `prv_key` is in `libraryhive-private`, and not the other way round.
+3. **Public object opens anonymously.** `curl -sI "<pub_url>"` from a machine with no credentials: expect `200` and `content-type: image/webp`. The URL must be exactly `MEDIA_PUBLIC_BASE_URL` plus the key. A `400` or `404` usually means the base URL is missing the bucket path or the bucket is not public.
+4. **Private object opens only with the signed link.** `curl -sI "<prv_url>"`: expect `200`. The URL must contain `X-Amz-Expires=600`, `X-Amz-Signature=` and `/ap-south-1/s3/aws4_request`.
+5. **Private object is closed anonymously.** Take `prv_url` and remove everything from `?` onward, then `curl -sI` it: expect `400` or `403`, never `200`. Also try the public-style address with the private bucket name, `https://<project-ref>.supabase.co/storage/v1/object/public/libraryhive-private/<prv_key>`: expect `400` or `404` (not `200`). Change one character of the signature: expect `403`.
+6. **Signed link expires after 600 seconds.** Request the same `prv_url` again after 11 minutes: expect `400` or `403` (expired; Supabase returned `400`). Generate a fresh one with `private_file_url(prv_key)` and confirm it works again.
+7. **Clean up.** `public_storage().delete(pub_key)` and `private_storage().delete(prv_key)`, then confirm both are gone in the dashboard and that `zz-storage-test/` is empty in both buckets. Delete `lh-test.webp`.
+8. **Through the app.** Finish with section 6 steps 1 to 9 (owner QR upload, student checkout, `MEDIA_ORIGIN` and CSP).
+
+If the upload in step 2 fails with an error about checksums or an unsupported header, record the exact message: the pinned boto3 sends newer integrity headers by default, and a provider that rejects them needs a client setting added. Do not guess; report the error.
 
 ## 7. First release and migrations (needs approval)
 

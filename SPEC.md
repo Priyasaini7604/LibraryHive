@@ -62,7 +62,9 @@
 | `Fee` / invoice | D14: dues are derived from `Membership.next_due_date` and the plan price. One payment equals one period. |
 | `NotificationLog` | Its dedup role is the unique `Notification.dedup_key`; delivery status lives in `NotificationDelivery`. |
 | `MembershipPeriod` | Each successful `Payment` stores `period_start` and `period_end`, which already gives the full renewal history. |
-| Analytics tables | Dashboards and reports are aggregate queries on live tables (MVP scale). |
+| Analytics tables | Dashboards and reports are aggregate queries on live tables (MVP scale). The internal platform dashboard (§4.12, D21) follows the same rule. |
+| `LibrarySubscription` / LibraryHive revenue | There is no billing between LibraryHive and a library (the first month is free for the pilot libraries, no commission, no subscription billing). Every `Payment` is a student paying a library, so it is **never** reported as LibraryHive revenue; platform subscription and MRR metrics are shown as unavailable until such a model is approved. |
+| Platform-admin role | The internal dashboard is open to an active Django superuser with staff access (checked in the database, never from the JWT `role`). `User.Role` stays `owner` and `student`. |
 | `LibraryDomain` / `LibraryAmenity` | Implicit Django M2M through tables (no extra fields needed). |
 
 ---
@@ -670,6 +672,18 @@ stateDiagram-v2
 There is at most one pending request per student per library. No calendar or slot-capacity engine is part of the MVP.
 
 ---
+
+### 4.12 Internal platform analytics (D21)
+
+A private, read-only dashboard for the LibraryHive team (`/platform`, `/api/v1/platform/analytics/*`). It adds no table: every figure is an aggregate computed in PostgreSQL by `apps/analytics/platform_selectors.py`, whose module docstring is the authoritative list of definitions (also shown on the dashboard).
+
+- **Access:** `IsPlatformAdmin` = an active `User` with `is_staff` and `is_superuser`, read from the database row on every request. Anonymous callers get 401; owners, students and staff without superuser get 403. `GET /auth/me/` returns `is_platform_admin` only as a UI hint.
+- **Booking** = one `Membership` row, dated by `created_at` in Asia/Kolkata. A membership exists only after a verified gateway payment, an owner admission, or an owner-approved UPI payment (§4.3b), so every row is a confirmed booking. Renewals extend a membership and are counted separately (successful renewal payments), never as new bookings. Archived memberships remain bookings and are also reported as ended tenures.
+- **Unique booking students** = `COUNT(DISTINCT student_id)`; a student with 10 bookings is 10 bookings and 1 student. **Monthly active students** = unique students with a booking in the current calendar month. **Repeat booking %** = share of the range's booking students who have more than one booking in total.
+- **Holds are not bookings.** Cancelled and expired booking holds are *abandoned*. A hold behind a pending or approved direct UPI claim is **not** abandoned (the owner may still approve it): pending claims are reported as `awaiting_upi_review`; rejected and cancelled claims leave the hold abandoned.
+- **Payments are students paying libraries.** The "student payments online" figure counts gateway payments (`channel='online'`) only. Manually verified UPI payments (`channel='offline'`, `method='upi_direct'`) are therefore never mixed into it, and neither is ever LibraryHive revenue (`is_platform_revenue` is always false). Library subscription plan, plan limits, subscription revenue, MRR and revenue by plan are listed as unavailable and are never estimated.
+- **Privacy:** responses hold aggregates and library names and cities only: no student or owner name, email or phone, and no per-person attendance.
+- **Range:** `from`/`to` are inclusive business dates (default the last 30 days, at most 366 days); the library table is paginated, searchable and sortable.
 
 ## 5. Migration from the current schema
 

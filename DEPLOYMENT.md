@@ -94,7 +94,7 @@ With `ENVIRONMENT=production` the app **will not start** (`ImproperlyConfigured`
 
 Optional: `JOB_TRIGGER_TOKEN` (enables `/api/v1/internal/jobs/run/`; leave unset, the scheduler is GitHub Actions), `DB_CONN_MAX_AGE`, `SEAT_HOLD_MINUTES`.
 
-Static files are served by WhiteNoise (collected at build). Media is not served by Django in production. The Django admin is reached at `ADMIN_URL`; create the first platform administrator after migrating (section 7). The UPI settings and requests are **not** registered in the Django admin: owners manage them in the app (see Rollback for the emergency route).
+Static files are served by WhiteNoise (collected at build). Media is not served by Django in production. The Django admin is reached at `ADMIN_URL`; create the first platform administrator after migrating (section 7). That same superuser account opens the internal analytics dashboard at `/platform` after logging in (nothing extra to configure; owners and students get 403). The UPI settings and requests are **not** registered in the Django admin: owners manage them in the app (see Rollback for the emergency route).
 
 ## 4. Vercel (frontend)
 
@@ -180,3 +180,5 @@ Order matters. Migrations in this release are **additive only** (`payments 0003`
 9. Check **UPI settings** shows the live QR and that removing the UPI ID while UPI is on is refused.
 10. A security-header spot check: `curl -sI` the frontend and the API for `Strict-Transport-Security` (after HSTS is raised), `X-Content-Type-Options` and the CSP.
 11. Confirm no scheduler other than GitHub Actions is running against this database.
+12. Platform analytics: log in as the superuser created in section 7; the app should send you to `/platform` (overview cards, trend, calculation notes). Open `/platform/libraries` (search, sort, page, change the date range). Log in as an owner and as a student: both must be refused at `/platform`, and a direct `GET /api/v1/platform/analytics/overview/` with their token must be 403. Confirm no response contains a student's name, email or phone.
+13. The public `/privacy` page loads without logging in.

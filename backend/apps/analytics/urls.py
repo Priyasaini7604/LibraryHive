@@ -12,5 +12,9 @@ urlpatterns = [
     path("owner/exports/payments.csv", views.PaymentsExportView.as_view(), name="export-payments"),
     path("owner/exports/attendance.csv", views.AttendanceExportView.as_view(), name="export-attendance"),
     path("owner/audit-log/", views.AuditLogView.as_view(), name="owner-audit-log"),
+    path("platform/analytics/overview/", views.PlatformOverviewView.as_view(), name="platform-overview"),
+    path("platform/analytics/bookings/", views.PlatformBookingsView.as_view(), name="platform-bookings"),
+    path("platform/analytics/libraries/", views.PlatformLibrariesView.as_view(), name="platform-libraries"),
+    path("platform/analytics/subscriptions/", views.PlatformSubscriptionsView.as_view(), name="platform-subscriptions"),
     path("student/dashboard/", views.StudentDashboardView.as_view(), name="student-dashboard"),
 ]

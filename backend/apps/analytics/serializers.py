@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from rest_framework import serializers
 
+from . import platform_selectors
 from .selectors import MAX_REVENUE_DAYS
 
 
@@ -95,3 +96,31 @@ def student_dashboard_data(data: dict) -> dict:
             "expires_at": hold.expires_at,
         },
     }
+
+
+class PlatformRangeQuery(_FromTo):
+    """Date range for the internal dashboard: defaults to the last 30 days, at most 366 days."""
+
+    granularity = serializers.ChoiceField(choices=platform_selectors.GRANULARITIES, required=False, default="day")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        _, default_end = platform_selectors.default_range()
+        end = attrs.get("to") or default_end
+        start = attrs.get("from_") or (end - timedelta(days=platform_selectors.DEFAULT_RANGE_DAYS - 1))
+        if end < start:
+            raise serializers.ValidationError({"to": ["Must not be before the start date."]})
+        if end - start > timedelta(days=platform_selectors.MAX_RANGE_DAYS - 1):
+            raise serializers.ValidationError("Choose a range of at most 366 days.")
+        attrs["from_"], attrs["to"] = start, end
+        return attrs
+
+
+class PlatformLibrariesQuery(PlatformRangeQuery):
+    search = serializers.CharField(required=False, allow_blank=True, max_length=100, default="")
+    ordering = serializers.CharField(required=False, default="-bookings")
+
+    def validate_ordering(self, value):
+        if value.lstrip("-") not in platform_selectors.LIBRARY_ORDERINGS:
+            raise serializers.ValidationError("Unknown ordering.")
+        return value

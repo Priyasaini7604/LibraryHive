@@ -60,6 +60,24 @@ describe("decideAccess", () => {
   });
 });
 
+describe("platform area", () => {
+  const admin: User = { ...owner, id: "a1", has_library: false, is_platform_admin: true };
+
+  it("lets only the LibraryHive team into /platform", () => {
+    expect(decideAccess("authenticated", admin, "platform", "/platform")).toEqual({ kind: "allow" });
+    expect(decideAccess("authenticated", owner, "platform", "/platform")).toEqual({ kind: "redirect", to: "/owner" });
+    expect(decideAccess("authenticated", student, "platform", "/platform")).toEqual({ kind: "redirect", to: "/student" });
+    expect(decideAccess("anonymous", null, "platform", "/platform")).toEqual({
+      kind: "redirect",
+      to: "/login?next=%2Fplatform",
+    });
+  });
+
+  it("sends the team away from the owner area, not into library onboarding", () => {
+    expect(decideAccess("authenticated", admin, "owner", "/owner")).toEqual({ kind: "redirect", to: "/platform" });
+  });
+});
+
 describe("AuthGuard", () => {
   beforeEach(() => {
     replace.mockReset();

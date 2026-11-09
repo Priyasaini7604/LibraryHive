@@ -532,6 +532,19 @@ Implemented in `apps/payments/upi_services.py`, `upi_selectors.py`, `upi_seriali
 
 **Totals:** 91 endpoint entries (93 routes counting the 3 CSV exports separately), including 13a and 13b. P1 items are marked; they are built after the module's P0 items.
 
+### 9.13b Internal platform analytics (`analytics`), D21
+
+Read-only endpoints for the LibraryHive team, in `apps/analytics/views.py` (`Platform*View`), `serializers.py` (query validation) and `platform_selectors.py` (aggregates). Permission: `[IsAuthenticated, IsPlatformAdmin]` (active superuser with staff access, read from the database; the JWT role is never used). Owners and students get 403, anonymous callers 401. All are `GET` and return the standard envelope. Definitions: SPEC §4.12.
+
+| Path | Purpose | Query |
+|---|---|---|
+| `/platform/analytics/overview/` | All-time totals: registered students (self-signed-up and owner-added walk-ins separately), libraries, bookings (online and offline), unique and monthly active students | none |
+| `/platform/analytics/bookings/` | Today, this week, this month; range totals, repeat students and percent, renewals, archived memberships, check-ins and distinct checked-in students; booking trend; library split; holds (`completed`, `cancelled`, `expired`, `still_pending`, `awaiting_upi_review`, `abandoned`) | `from`, `to`, `granularity` = `day`\|`week`\|`month` |
+| `/platform/analytics/libraries/` | Paginated per-library table (members, active members, online students, bookings, check-ins, unique students in range); `subscription_plan` and `subscription_status` are always `null` | `from`, `to`, `search`, `ordering`, `page`, `page_size` |
+| `/platform/analytics/subscriptions/` | Per-library averages, online (gateway) student payment health, and the list of unavailable metrics | `from`, `to` |
+
+`GET /auth/me/` also returns `is_platform_admin` (a UI hint that routes the team to `/platform`; the backend re-checks on every call). Ranges are inclusive Asia/Kolkata dates, default 30 days, maximum 366. No endpoint returns a student's or an owner's name, email or phone. Manual UPI payments (`channel='offline'`, `method='upi_direct'`) are excluded from the gateway payment figures; nothing here is LibraryHive revenue.
+
 ### 9.14 Replaced existing endpoints (no duplicates remain)
 
 | Existing (Phase 0) | Replaced by |

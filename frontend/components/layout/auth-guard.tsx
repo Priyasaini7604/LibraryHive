@@ -16,11 +16,17 @@ type GuardDecision = { kind: "wait" } | { kind: "redirect"; to: string } | { kin
 export function decideAccess(
   status: "loading" | "authenticated" | "anonymous",
   user: User | null,
-  role: Role,
+  role: Role | "platform",
   pathname: string,
 ): GuardDecision {
   if (status === "loading") return { kind: "wait" };
   if (status === "anonymous" || !user) return { kind: "redirect", to: loginUrl(pathname) };
+  const platformAdmin = user.is_platform_admin === true;
+  if (role === "platform") {
+    return platformAdmin ? { kind: "allow" } : { kind: "redirect", to: homeFor(user.role) };
+  }
+  // The team has no library or student account to manage: send them to their own area.
+  if (platformAdmin) return { kind: "redirect", to: homeFor(user.role, true) };
   if (user.role !== role) return { kind: "redirect", to: homeFor(user.role) };
   if (role === "owner" && user.has_library === false && !pathname.startsWith(ONBOARDING_PATH)) {
     return { kind: "redirect", to: ONBOARDING_PATH };
@@ -32,7 +38,7 @@ export function decideAccess(
  * Client-side routing guard for /student and /owner. It improves the
  * experience only; every permission is enforced by the backend.
  */
-export function AuthGuard({ requiredRole, children }: { requiredRole: Role; children: React.ReactNode }) {
+export function AuthGuard({ requiredRole, children }: { requiredRole: Role | "platform"; children: React.ReactNode }) {
   const { status, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
